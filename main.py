@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from http.cookiejar import debug
 from pathlib import Path
 
 import typer
@@ -285,6 +286,7 @@ def web_command(
         host=host,
         port=port,
         reload=False,
+        log_level=logging.WARNING
     )
 
 

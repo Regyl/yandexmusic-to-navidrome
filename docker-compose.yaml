@@ -1,0 +1,24 @@
+# Run the YM-Navidrome migration status web server.
+# Requires YM_NAVIDROME_DATA to point at a directory with migration state (migration.db, migration.log).
+# Usage: docker compose up -d
+# Web UI: http://localhost:8765
+
+services:
+  web_server:
+    image: regyl/navidrome-rw:latest
+    ports:
+      - "8765:12080"
+    environment:
+      - YM_NAVIDROME_DATA=/migration/data
+      - NAVIDROME_FOLDER=/migration/target # change this
+      - YTDLP_DOWNLOAD_DIR=/migration/tmp/ytdlp
+      - SLSK_DOWNLOAD_DIR=/migration/tmp/slskd
+      - SLSK_USERNAME=RandomUserName # change this
+      - SLSK_PASSWORD=RandomPassword # change this
+      - YANDEX_MUSIC_TOKEN=MegaToken # change this
+    volumes:
+      - navidrome_data:/migration
+    restart: unless-stopped
+
+volumes:
+  navidrome_data:
