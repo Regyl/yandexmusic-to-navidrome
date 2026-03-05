@@ -100,3 +100,17 @@ class MigrationDB:
         )
         row = cursor.fetchone()
         return row[0] if row else 0
+
+    def get_failed_count(self) -> int:
+        """Return the number of failed tracks."""
+        cursor = self._connection.execute(
+            "SELECT COUNT(*) FROM migrations WHERE status = 'failed'"
+        )
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+    def get_total_count(self) -> int:
+        """Return the total number of tracks in migrations (success + failed)."""
+        cursor = self._connection.execute("SELECT COUNT(*) FROM migrations")
+        row = cursor.fetchone()
+        return row[0] if row else 0

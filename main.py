@@ -23,6 +23,7 @@ from util.utils import (
     download_cover_image,
     ensure_directory,
 )
+import uvicorn
 
 app = typer.Typer(help="Migrate Yandex Music liked tracks into a Navidrome library.")
 _logger = logging.getLogger("yandexmusic_to_navidrome")
@@ -292,6 +293,20 @@ def count_successful_command(
     data_dir = _get_data_dir()
     configure_logging(data_dir / "migration.log")
     run_count_successful(data_dir)
+
+
+@app.command("web")
+def web_command(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host."),
+    port: int = typer.Option(8765, "--port", help="Bind port."),
+) -> None:
+    """Start the web UI server to view migration status."""
+    uvicorn.run(
+        "web_server:app",
+        host=host,
+        port=port,
+        reload=False,
+    )
 
 
 def main() -> None:

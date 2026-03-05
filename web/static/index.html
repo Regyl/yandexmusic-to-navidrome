@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YM → Navidrome · Migration Status</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-start: #0f0f1a;
+      --bg-mid: #1a1a2e;
+      --bg-end: #16213e;
+      --accent: #e94560;
+      --accent-soft: rgba(233, 69, 96, 0.15);
+      --success: #00d9a5;
+      --success-soft: rgba(0, 217, 165, 0.12);
+      --warn: #ffc857;
+      --warn-soft: rgba(255, 200, 87, 0.12);
+      --text: #e8e8e8;
+      --text-muted: #8b8b9e;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.06);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: linear-gradient(145deg, var(--bg-start) 0%, var(--bg-mid) 40%, var(--bg-end) 100%);
+      min-height: 100vh;
+      color: var(--text);
+      padding: 2rem 1rem 4rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse 60% 50% at 50% -20%, rgba(233, 69, 96, 0.12) 0%, transparent 50%),
+                  radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0, 217, 165, 0.08) 0%, transparent 45%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-weight: 600;
+      font-size: clamp(1.6rem, 4vw, 2rem);
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .sub {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+      font-weight: 400;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .stat.total { border-left: 3px solid var(--text-muted); }
+    .stat.success { border-left: 3px solid var(--success); }
+    .stat.failed { border-left: 3px solid var(--accent); }
+
+    .stat .value {
+      font-size: 1.85rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .stat.total .value { color: var(--text); }
+    .stat.success .value { color: var(--success); }
+    .stat.failed .value { color: var(--accent); }
+
+    .stat .label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+    }
+
+    .progress-wrap {
+      margin-bottom: 2rem;
+    }
+
+    .progress-wrap h2 {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .progress-bar {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--success) 0%, #00b894 100%);
+      transition: width 0.5s ease;
+    }
+
+    .progress-fill.partial {
+      background: linear-gradient(90deg, var(--warn) 0%, var(--accent) 100%);
+    }
+
+    .failed-section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+
+    .failed-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .failed-section h2 .badge {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    .failed-list {
+      list-style: none;
+    }
+
+    .failed-list li {
+      padding: 0.85rem 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-sm);
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--accent);
+      font-size: 0.9rem;
+    }
+
+    .failed-list li:last-child {
+      margin-bottom: 0;
+    }
+
+    .failed-list .track-id {
+      font-weight: 500;
+      color: var(--text);
+      font-family: ui-monospace, monospace;
+    }
+
+    .failed-list .error {
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+      word-break: break-word;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .footer .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      margin-right: 0.4rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .loading .stat .value,
+    .loading .progress-fill {
+      opacity: 0.6;
+    }
+
+    .run-section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+
+    .run-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .job-status {
+      min-height: 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .job-status.running {
+      color: var(--warn);
+    }
+
+    .job-status.failed {
+      color: var(--accent);
+    }
+
+    .job-status.finished {
+      color: var(--success);
+    }
+
+    .run-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .run-card {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem;
+      border: 1px solid var(--card-border);
+    }
+
+    .run-card-wide {
+      grid-column: 1 / -1;
+    }
+
+    .run-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: var(--text);
+    }
+
+    .run-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .run-row {
+      margin-bottom: 0.6rem;
+    }
+
+    .run-row label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .run-row input {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .run-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .btn {
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:hover:not(:disabled) {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, #c73e54 100%);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>YM → Navidrome</h1>
+      <p class="sub">Migration status</p>
+    </header>
+
+    <div class="stats">
+      <div class="stat total">
+        <div class="value" data-stat="total">—</div>
+        <div class="label">Processed</div>
+      </div>
+      <div class="stat success">
+        <div class="value" data-stat="success">—</div>
+        <div class="label">Success</div>
+      </div>
+      <div class="stat failed">
+        <div class="value" data-stat="failed">—</div>
+        <div class="label">Failed</div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <h2>Success rate</h2>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <section class="run-section">
+      <h2>Run command</h2>
+      <div class="job-status" id="jobStatus"></div>
+      <div class="run-grid">
+        <div class="run-card">
+          <h3>YM Import</h3>
+          <p class="run-desc">Sync liked tracks from Yandex Music</p>
+          <div class="run-row">
+            <label>Timeout (min)</label>
+            <input type="number" id="ymTimeout" min="1" value="10" />
+          </div>
+          <button type="button" class="btn btn-primary" id="btnYmImport">Run ym-import</button>
+        </div>
+        <div class="run-card">
+          <h3>Retry failed</h3>
+          <p class="run-desc">Retry previously failed downloads</p>
+          <div class="run-row">
+            <label>Timeout (min)</label>
+            <input type="number" id="retryTimeout" min="1" value="10" />
+          </div>
+          <button type="button" class="btn btn-primary" id="btnRetryFailed">Run retry-failed</button>
+        </div>
+        <div class="run-card run-card-wide">
+          <h3>SoundCloud Import</h3>
+          <p class="run-desc">Import a playlist by URL</p>
+          <div class="run-row">
+            <label>Playlist URL</label>
+            <input type="url" id="soundcloudUrl" placeholder="https://soundcloud.com/..." />
+          </div>
+          <div class="run-row">
+            <label>Timeout (min)</label>
+            <input type="number" id="scTimeout" min="1" value="10" />
+          </div>
+          <button type="button" class="btn btn-primary" id="btnSoundcloud">Run soundcloud-import</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="failed-section">
+      <h2>Failed tracks <span class="badge" id="failedBadge">0</span></h2>
+      <ul class="failed-list" id="failedList">
+        <li class="empty-state">No failed tracks</li>
+      </ul>
+    </section>
+
+    <p class="footer">
+      <span class="dot"></span> Auto-refresh every 5s
+    </p>
+  </div>
+
+  <script>
+    const progressFill = document.getElementById('progressFill');
+    const failedBadge = document.getElementById('failedBadge');
+    const failedList = document.getElementById('failedList');
+    const jobStatusEl = document.getElementById('jobStatus');
+    const btnYm = document.getElementById('btnYmImport');
+    const btnRetry = document.getElementById('btnRetryFailed');
+    const btnSc = document.getElementById('btnSoundcloud');
+
+    function render(data) {
+      const total = data.total_count ?? 0;
+      const success = data.success_count ?? 0;
+      const failed = data.failed_count ?? 0;
+
+      document.querySelector('[data-stat="total"]').textContent = total.toLocaleString();
+      document.querySelector('[data-stat="success"]').textContent = success.toLocaleString();
+      document.querySelector('[data-stat="failed"]').textContent = failed.toLocaleString();
+
+      const pct = total > 0 ? Math.round((success / total) * 100) : 0;
+      progressFill.style.width = pct + '%';
+      progressFill.classList.toggle('partial', failed > 0 && success > 0);
+
+      failedBadge.textContent = failed;
+
+      if (!data.failed_tracks || data.failed_tracks.length === 0) {
+        failedList.innerHTML = '<li class="empty-state">No failed tracks</li>';
+      } else {
+        failedList.innerHTML = data.failed_tracks.map(({ track_id, error }) =>
+          `<li>
+            <span class="track-id">${escapeHtml(track_id)}</span>
+            ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
+          </li>`
+        ).join('');
+      }
+
+      const job = data.job || null;
+      jobStatusEl.className = 'job-status';
+      if (!job) {
+        jobStatusEl.textContent = '';
+      } else if (job.status === 'running') {
+        jobStatusEl.classList.add('running');
+        const since = job.started_at ? new Date(job.started_at).toLocaleTimeString() : '';
+        jobStatusEl.textContent = 'Running: ' + job.command + (since ? ' (started ' + since + ')' : '');
+      } else if (job.status === 'finished') {
+        jobStatusEl.classList.add('finished');
+        const at = job.finished_at ? new Date(job.finished_at).toLocaleTimeString() : '';
+        jobStatusEl.textContent = 'Last run: ' + job.command + ' finished' + (at ? ' at ' + at : '');
+      } else if (job.status === 'failed') {
+        jobStatusEl.classList.add('failed');
+        jobStatusEl.textContent = 'Last run failed: ' + job.command + (job.error ? ' — ' + job.error : '');
+      } else {
+        jobStatusEl.textContent = '';
+      }
+
+      const running = job && job.status === 'running';
+      btnYm.disabled = running;
+      btnRetry.disabled = running;
+      btnSc.disabled = running;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    let pollInterval = 5000;
+
+    async function fetchStatus() {
+      try {
+        const r = await fetch('/api/status');
+        if (!r.ok) throw new Error(r.statusText);
+        const data = await r.json();
+        document.body.classList.remove('loading');
+        render(data);
+        const job = data.job;
+        if (job && job.status === 'running') {
+          if (pollInterval !== 2000) {
+            pollInterval = 2000;
+            clearInterval(intervalId);
+            intervalId = setInterval(fetchStatus, 2000);
+          }
+        } else {
+          if (pollInterval !== 5000) {
+            pollInterval = 5000;
+            clearInterval(intervalId);
+            intervalId = setInterval(fetchStatus, 5000);
+          }
+        }
+      } catch (e) {
+        document.body.classList.add('loading');
+        document.querySelector('[data-stat="total"]').textContent = '—';
+        document.querySelector('[data-stat="success"]').textContent = '—';
+        document.querySelector('[data-stat="failed"]').textContent = '—';
+        progressFill.style.width = '0%';
+        failedList.innerHTML = '<li class="empty-state">Could not load status. Is the server running?</li>';
+      }
+    }
+
+    async function runCommand(url, body) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          const err = Array.isArray(data.detail)
+            ? data.detail.map(function (d) { return d.msg || JSON.stringify(d); }).join(', ')
+            : (data.detail || r.statusText);
+          alert(err);
+          return;
+        }
+        fetchStatus();
+      } catch (e) {
+        alert('Request failed: ' + e.message);
+      }
+    }
+
+    btnYm.addEventListener('click', () => {
+      const timeout = parseInt(document.getElementById('ymTimeout').value, 10) || 10;
+      runCommand('/api/run/ym-import', { timeout_minutes: Math.max(1, timeout) });
+    });
+    btnRetry.addEventListener('click', () => {
+      const timeout = parseInt(document.getElementById('retryTimeout').value, 10) || 10;
+      runCommand('/api/run/retry-failed', { timeout_minutes: Math.max(1, timeout) });
+    });
+    btnSc.addEventListener('click', () => {
+      const url = document.getElementById('soundcloudUrl').value.trim();
+      if (!url) {
+        alert('Enter a SoundCloud playlist URL');
+        return;
+      }
+      const timeout = parseInt(document.getElementById('scTimeout').value, 10) || 10;
+      runCommand('/api/run/soundcloud-import', { playlist_url: url, timeout_minutes: Math.max(1, timeout) });
+    });
+
+    let intervalId = setInterval(fetchStatus, 5000);
+    fetchStatus();
+  </script>
+</body>
+</html>
