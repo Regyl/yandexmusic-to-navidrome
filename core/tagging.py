@@ -5,10 +5,31 @@ from typing import Optional
 
 from mutagen import File
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC, ID3, TIT2, TPE1, TALB, TRCK, TDRC
+from mutagen.id3 import APIC, ID3, TALB, TCON, TDRC, TIT2, TPOS, TRCK, TPE1, TPE2, TCMP
 from mutagen.mp3 import MP3
 
 from core.yandex_client import TrackMetadata
+
+# Navidrome preferred separator for multiple artists when using single-valued tag
+_ARTIST_SEP = " / "
+
+
+def _is_compilation(track: TrackMetadata) -> bool:
+    """True if track is part of a compilation (Various Artists) per Navidrome."""
+    if not track.album_artists:
+        return False
+    if len(track.album_artists) > 1:
+        return True
+    return track.album_artists[0].strip().lower() == "various artists"
+
+
+def _album_artist_display(track: TrackMetadata) -> str:
+    """Album Artist for display; fallback to first track artist if no album artists."""
+    if track.album_artists:
+        return _ARTIST_SEP.join(track.album_artists)
+    if track.artists:
+        return _ARTIST_SEP.join(track.artists)
+    return ""
 
 
 def _embed_mp3_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[bytes]) -> None:
@@ -18,13 +39,23 @@ def _embed_mp3_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byte
 
     audio.tags["TIT2"] = TIT2(encoding=3, text=track.title)
     if track.artists:
-        audio.tags["TPE1"] = TPE1(encoding=3, text=", ".join(track.artists))
+        # Multi-valued TPE1 (ID3v2.4) preferred by Navidrome; list = separate artists
+        audio.tags["TPE1"] = TPE1(encoding=3, text=track.artists)
     if track.album:
         audio.tags["TALB"] = TALB(encoding=3, text=track.album)
-    if track.track_number:
+    album_artist_list = track.album_artists or track.artists
+    if album_artist_list:
+        audio.tags["TPE2"] = TPE2(encoding=3, text=album_artist_list)
+    if track.track_number is not None:
         audio.tags["TRCK"] = TRCK(encoding=3, text=str(track.track_number))
-    if track.year:
+    if track.disc_number is not None:
+        audio.tags["TPOS"] = TPOS(encoding=3, text=str(track.disc_number))
+    if track.year is not None:
         audio.tags["TDRC"] = TDRC(encoding=3, text=str(track.year))
+    if track.genres:
+        audio.tags["TCON"] = TCON(encoding=3, text=track.genres)
+    if _is_compilation(track):
+        audio.tags["TCMP"] = TCMP(encoding=3, text="1")
 
     if cover_bytes:
         audio.tags["APIC"] = APIC(
@@ -42,13 +73,26 @@ def _embed_flac_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byt
     audio = FLAC(path)
     audio["title"] = track.title
     if track.artists:
-        audio["artist"] = ", ".join(track.artists)
+        # Singular ARTIST = display name; plural ARTISTS = multi-valued (Navidrome preferred)
+        audio["artist"] = _ARTIST_SEP.join(track.artists)
+        audio["artists"] = track.artists
     if track.album:
         audio["album"] = track.album
-    if track.track_number:
+    album_artist = _album_artist_display(track)
+    if album_artist:
+        audio["albumartist"] = album_artist
+    if track.album_artists:
+        audio["albumartists"] = track.album_artists
+    if track.track_number is not None:
         audio["tracknumber"] = str(track.track_number)
-    if track.year:
+    if track.disc_number is not None:
+        audio["discnumber"] = str(track.disc_number)
+    if track.year is not None:
         audio["date"] = str(track.year)
+    if track.genres:
+        audio["genre"] = track.genres
+    if _is_compilation(track):
+        audio["compilation"] = "1"
 
     if cover_bytes:
         pic = Picture()
@@ -75,12 +119,24 @@ def embed_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[bytes]) -
             return
         audio["title"] = track.title
         if track.artists:
-            audio["artist"] = ", ".join(track.artists)
+            audio["artist"] = _ARTIST_SEP.join(track.artists)
+            audio["artists"] = track.artists
         if track.album:
             audio["album"] = track.album
-        if track.track_number:
+        album_artist = _album_artist_display(track)
+        if album_artist:
+            audio["albumartist"] = album_artist
+        if track.album_artists:
+            audio["albumartists"] = track.album_artists
+        if track.track_number is not None:
             audio["tracknumber"] = str(track.track_number)
-        if track.year:
+        if track.disc_number is not None:
+            audio["discnumber"] = str(track.disc_number)
+        if track.year is not None:
             audio["date"] = str(track.year)
+        if track.genres:
+            audio["genre"] = track.genres
+        if _is_compilation(track):
+            audio["compilation"] = "1"
         audio.save()
 

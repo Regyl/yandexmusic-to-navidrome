@@ -17,6 +17,21 @@ _logger = logging.getLogger("yandex_client")
 
 _client_singleton: Optional[Client] = None
 
+def _album_genres_to_list(album) -> List[str]:
+    """Extract genre names from album.genre into a list of strings."""
+    if album is None:
+        return []
+    raw = getattr(album, "genre", None)
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [
+            getattr(g, "name", g) if not isinstance(g, str) else g
+            for g in raw
+        ]
+    return [str(raw)] if raw else []
+
+
 @dataclass
 class TrackMetadata:
     track_id: str
@@ -29,6 +44,7 @@ class TrackMetadata:
     disc_number: Optional[int]
     duration_ms: Optional[int]
     cover_uri: Optional[str]
+    genres: List[str]
 
 
 def _get_client() -> Client:
@@ -62,13 +78,22 @@ def _build_metadata(track: Track) -> TrackMetadata:
         cover_uri=getattr(track, "cover_uri", None) or (
             getattr(album, "cover_uri", None) if album else None
         ),
+        genres=_album_genres_to_list(album),
     )
 
 
 def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]:
     if cache_path is not None and cache_path.exists():
         data = json.loads(cache_path.read_text(encoding="utf-8"))
-        return [TrackMetadata(**item) for item in data]
+        result = []
+        for item in data:
+            # Backward compat: old cache had "genre" (str), now we use "genres" (list)
+            if "genres" not in item and "genre" in item:
+                item = dict(item)
+                item["genres"] = [item["genre"]] if item.get("genre") else []
+                del item["genre"]
+            result.append(TrackMetadata(**item))
+        return result
 
     client = _get_client()
     likes = client.users_likes_tracks()
@@ -77,8 +102,8 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
 
     for liked in likes:
         full_track = liked.fetch_track()
-        _logger.info(f"Fetched track {full_track.title}")
-        time.sleep(0.5)
+        _logger.info(f"Built metadata for {full_track.title} - {full_track.artists}")
+        time.sleep(0.5) # To prevent rate-limiters
         result.append(_build_metadata(full_track))
 
     if cache_path is not None:

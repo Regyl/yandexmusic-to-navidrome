@@ -13,7 +13,8 @@ from core.lyrics import generate_lrc_for_track
 from core.slsk_client import download_track_with_retries as download_track_soulseek
 from core.tagging import embed_tags
 from core.yandex_client import TrackMetadata, fetch_failed_track_metadata, fetch_liked_tracks
-from core.ytdlp_client import download_track as download_track_ytdlp
+from core.ytdlp_client import download_track as download_track_ytdlp, download_track_from_url as download_track_ytdlp_url
+from core.soundcloud_client import fetch_playlist_tracks
 from util.utils import (
     DownloadError,
     build_album_directory,
@@ -52,6 +53,7 @@ def process_single_track(
     track: TrackMetadata,
     cfg: AppConfig,
     db: MigrationDB,
+    source_url: str | None = None,
 ) -> None:
     if db.is_successful(track.track_id):
         _logger.info(
@@ -74,20 +76,26 @@ def process_single_track(
         return
 
     try:
-        try:
-            download_path, actual_extension = download_track_ytdlp(
-                track=track,
+        if source_url:
+            download_path, actual_extension = download_track_ytdlp_url(
+                url=source_url,
                 timeout_seconds=cfg.download_timeout_seconds,
             )
-        except DownloadError as e:
-            _logger.warning("download_error from yt-dlp: " + str(e), extra={"track_id": track.track_id})
-            if "The current session has been rate-limited by YouTube" in str(e):
-                exit(1)
-            download_path, actual_extension = download_track_soulseek(
-                track=track,
-                timeout_seconds=cfg.download_timeout_seconds,
-                max_retries=cfg.max_download_retries,
-            )
+        else:
+            try:
+                download_path, actual_extension = download_track_ytdlp(
+                    track=track,
+                    timeout_seconds=cfg.download_timeout_seconds,
+                )
+            except DownloadError as e:
+                _logger.warning("download_error from yt-dlp: " + str(e), extra={"track_id": track.track_id})
+                if "The current session has been rate-limited by YouTube" in str(e):
+                    exit(1)
+                download_path, actual_extension = download_track_soulseek(
+                    track=track,
+                    timeout_seconds=cfg.download_timeout_seconds,
+                    max_retries=cfg.max_download_retries,
+                )
     except (DownloadError, RuntimeError) as exc:
         _logger.error(
             "download_failed: " + str(exc),
@@ -164,13 +172,16 @@ def run_retry_failed(cfg: AppConfig) -> None:
 
 
 def _build_config(timeout_minutes: int) -> AppConfig:
+    folder = os.getenv("NAVIDROME_FOLDER")
+    if not folder:
+        raise RuntimeError("NAVIDROME_FOLDER environment variable not set")
     return AppConfig(
-        music_root=Path(os.getenv("NAVIDROME_FOLDER")),
+        music_root=Path(folder),
         download_timeout_seconds=timeout_minutes * 60,
     )
 
 
-@app.command("sync")
+@app.command("ym-import")
 def sync_command(
         timeout_minutes: int = typer.Option(
         10,
@@ -184,6 +195,44 @@ def sync_command(
     configure_logging(data_dir / "migration.log")
     cfg = _build_config(timeout_minutes)
     run_sync_like_tracks(cfg)
+
+
+def run_import_soundcloud_playlist(playlist_url: str, cfg: AppConfig) -> None:
+    """Fetch SoundCloud playlist and download each track into NAVIDROME_FOLDER."""
+    data_dir = _get_data_dir()
+    with MigrationDB(data_dir / "migration.db") as db:
+        tracks = fetch_playlist_tracks(playlist_url)
+        _logger.info(
+            "fetched_soundcloud_playlist",
+            extra={"url": playlist_url, "count": len(tracks)},
+        )
+        for sc_track in tracks:
+            process_single_track(
+                sc_track.metadata,
+                cfg,
+                db,
+                source_url=sc_track.url,
+            )
+
+
+@app.command("soundcloud-import")
+def import_soundcloud_command(
+    playlist_url: str = typer.Argument(
+        ...,
+        help="SoundCloud playlist/set URL, e.g. https://soundcloud.com/user/sets/playlist-name",
+    ),
+    timeout_minutes: int = typer.Option(
+        10,
+        "--timeout-minutes",
+        min=1,
+        help="Per-track download timeout in minutes.",
+    ),
+) -> None:
+    """Import a SoundCloud playlist: download all tracks into NAVIDROME_FOLDER."""
+    data_dir = _get_data_dir()
+    configure_logging(data_dir / "migration.log")
+    cfg = _build_config(timeout_minutes)
+    run_import_soundcloud_playlist(playlist_url, cfg)
 
 def run_list_failed(cache_dir: Path) -> None:
     with MigrationDB(cache_dir / "migration.db") as db:

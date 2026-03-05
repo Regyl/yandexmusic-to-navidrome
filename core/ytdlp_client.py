@@ -91,3 +91,40 @@ def download_track(track: TrackMetadata, timeout_seconds: int) -> Tuple[Path, st
 
     ext = path.suffix.lstrip(".").lower() or "mp3"
     return path, ext
+
+
+def download_track_from_url(url: str, timeout_seconds: int) -> Tuple[Path, str]:
+    """Download a single track from a direct URL (e.g. SoundCloud track) via yt-dlp. Returns (path, extension)."""
+    try:
+        ydl = _get_ydl(timeout_seconds)
+        info = ydl.extract_info(url, download=True)
+    except yt_dlp.utils.DownloadError as exc:
+        raise DownloadError(f"yt-dlp: {exc}") from exc
+    except Exception as exc:
+        raise DownloadError(f"yt-dlp: {exc}") from exc
+
+    if not info:
+        raise DownloadError(f"No yt-dlp results for url {url!r}")
+
+    requested = info.get("requested_downloads") or []
+    if not requested and info.get("entries"):
+        first_entry = info["entries"][0]
+        if isinstance(first_entry, dict) and first_entry:
+            requested = first_entry.get("requested_downloads") or []
+    if not requested:
+        raise DownloadError(f"No yt-dlp download for url {url!r}")
+
+    filepath = requested[0].get("filepath")
+    if not filepath:
+        raise DownloadError(f"No yt-dlp filepath for url {url!r}")
+
+    path = Path(filepath)
+    if not path.exists():
+        mp3_path = path.with_suffix(".mp3")
+        if mp3_path.exists():
+            path = mp3_path
+        else:
+            raise DownloadError(f"yt-dlp reported download but file missing: {path}")
+
+    ext = path.suffix.lstrip(".").lower() or "mp3"
+    return path, ext

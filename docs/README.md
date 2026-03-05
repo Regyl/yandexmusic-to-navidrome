@@ -44,7 +44,7 @@ pip install -r requirements.txt
 1. Запустить выгрузку с яндекс музыки в navidrome
 
 ```bash
-python -m main sync
+python -m main ym-import
 ```
 
 2. Попробовать обработать неуспешные повторно (с большим шансом ничего не даст, т.к. трек либо не найден, либо недоступен для скачиванияи т.п.)
@@ -65,18 +65,18 @@ python -m main list-failed
 python -m main count-successful
 ```
 
+5. Импорт плейлиста с SoundCloud в папку Navidrome (все треки скачиваются в `NAVIDROME_FOLDER`):
+
+```bash
+python -m main soundcloud-import "https://soundcloud.com/user/sets/playlist-name"
+```
+
 Про возможные клиенты для подключения к navidrome с телефона/пк [тут](CLIENTS.md)
 
 # Ограничения
 - YoutubeMusic, использующийся как главный источник, имеет свое ограничение на кол-во запросов в час. По умолчанию это 300. 
 В случае, если в процессе обработки вылетело исключение в формате `The current session has been rate-limited by YouTube` - перезапустите через час. Ранее обработанные треки не будут пуллиться по-новой. 
   - Детали [тут](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#common-youtube-errors)
-
-# Существующие проблемы
-- Не парсится жанр
-- Если у трека два и более исполнителя - они склеиваются в одного
-
-Как говорится, any contribution welcome.
 
 # Послесловие
 Да, условно еще одна обертка над yt-dlp. Да, использовал ИИ при написании. И что вы мне сделаете, я в другом городе.
