@@ -5,7 +5,7 @@ from typing import Optional
 
 from mutagen import File
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC, ID3, TIT2, TPE1, TALB, TRCK, TDRC
+from mutagen.id3 import APIC, ID3, TIT2, TPE1, TALB, TRCK, TDRC, TCON
 from mutagen.mp3 import MP3
 
 from core.yandex_client import TrackMetadata
@@ -25,6 +25,8 @@ def _embed_mp3_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byte
         audio.tags["TRCK"] = TRCK(encoding=3, text=str(track.track_number))
     if track.year:
         audio.tags["TDRC"] = TDRC(encoding=3, text=str(track.year))
+    if track.genres:
+        audio.tags["TCON"] = TCON(encoding=3, text=track.genres)
 
     if cover_bytes:
         audio.tags["APIC"] = APIC(
@@ -49,6 +51,8 @@ def _embed_flac_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byt
         audio["tracknumber"] = str(track.track_number)
     if track.year:
         audio["date"] = str(track.year)
+    if track.genres:
+        audio["genre"] = track.genres
 
     if cover_bytes:
         pic = Picture()
@@ -82,5 +86,7 @@ def embed_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[bytes]) -
             audio["tracknumber"] = str(track.track_number)
         if track.year:
             audio["date"] = str(track.year)
+        if track.genres:
+            audio["genre"] = track.genres
         audio.save()
 
