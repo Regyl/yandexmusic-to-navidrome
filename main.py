@@ -58,10 +58,7 @@ def process_single_track(
     source_url: str | None = None,
 ) -> None:
     if db.is_successful(track.track_id):
-        _logger.info(
-            "track_already_migrated",
-            extra={"track_id": track.track_id, "title": track.title},
-        )
+        _logger.info(f"track_already_migrated for {track.title}")
         return
 
     album_dir = build_album_directory(cfg.music_root, track)
@@ -70,10 +67,7 @@ def process_single_track(
     audio_dest = album_dir / build_track_filename(track, extension="mp3")
 
     if audio_dest.exists():
-        _logger.info(
-            "destination_exists_skip",
-            extra={"track_id": track.track_id, "path": str(audio_dest)},
-        )
+        _logger.info(f"destination_exists_skip for {track.title}")
         db.mark_success(track.track_id, str(audio_dest))
         return
 
@@ -90,7 +84,7 @@ def process_single_track(
                     timeout_seconds=cfg.download_timeout_seconds,
                 )
             except DownloadError as e:
-                _logger.warning("download_error from yt-dlp: " + str(e), extra={"track_id": track.track_id})
+                _logger.warning("download_error from yt-dlp: " + str(e))
                 if "The current session has been rate-limited by YouTube" in str(e):
                     raise Exception("The current session has been rate-limited by YouTube. Retry after an hour")
                 download_path, actual_extension = download_track_soulseek(
@@ -99,13 +93,10 @@ def process_single_track(
                     max_retries=cfg.max_download_retries,
                 )
     except (DownloadError, RuntimeError) as exc:
-        _logger.error(
-            "download_failed: " + str(exc),
-            extra={"track_id": track.track_id, "error": str(exc)},
-        )
+        _logger.error(f"download_failed: {str(exc)}")
         db.mark_failed(track.track_id, str(exc))
         return
-    _logger.info("download_successful", extra={"title": track.title})
+    _logger.info(f"download_successful for {track.title}")
 
     final_audio_dest = album_dir / build_track_filename(
         track, extension=actual_extension
@@ -122,23 +113,13 @@ def process_single_track(
 
     try:
         embed_tags(final_audio_dest, track, cover_bytes)
-    except Exception as exc:
-        _logger.error(
-            "tagging_failed",
-            extra={
-                "track_id": track.track_id,
-                "path": str(final_audio_dest),
-                "error": str(exc),
-            },
-        )
+    except Exception:
+        _logger.warning(f"tagging_failed for {track.title}")
 
     try:
         generate_lrc_for_track(final_audio_dest, track)
-    except Exception as exc:
-        _logger.warning(
-            "lyrics_failed",
-            extra={"track_id": track.track_id, "error": str(exc)},
-        )
+    except Exception:
+        _logger.warning(f"lyrics_failed for {track.title}")
 
     db.mark_success(track.track_id, str(final_audio_dest))
 
@@ -149,10 +130,7 @@ def run_sync_like_tracks(cfg: AppConfig) -> None:
         liked_tracks = fetch_liked_tracks(
             cache_path=data_dir / "migration_liked_tracks.json"
         )
-        _logger.info(
-            "fetched_yandex_liked_tracks",
-            extra={"count": len(liked_tracks)},
-        )
+        _logger.info(f"fetched_yandex_liked_tracks: {len(liked_tracks)}")
 
         for track in liked_tracks:
             process_single_track(track, cfg, db)
@@ -166,7 +144,7 @@ def run_retry_failed(cfg: AppConfig) -> None:
             _logger.info("no_failed_tracks_to_retry")
             return
 
-        _logger.info("retrying_failed_tracks", extra={"count": len(failed_ids)})
+        _logger.info(f"retrying_failed_tracks: {len(failed_ids)}")
 
         for track_id in failed_ids:
             track = fetch_failed_track_metadata(track_id)
@@ -195,10 +173,7 @@ def run_import_soundcloud_likes(username: str, cfg: AppConfig) -> None:
     data_dir = _get_data_dir()
     with MigrationDB(data_dir / "migration.db") as db:
         tracks = soundcloud_client.fetch_all_tracks_for_user(username)
-        _logger.info(
-            "fetched_soundcloud_likes_and_playlists",
-            extra={"username": username, "count": len(tracks)},
-        )
+        _logger.info(f"fetched_soundcloud_likes_and_playlists: {len(tracks)}")
         for sc_track in tracks:
             process_single_track(
                 sc_track.metadata,
@@ -263,7 +238,7 @@ def list_failed_command(
 def run_count_successful(data_dir: Path) -> None:
     with MigrationDB(data_dir / "migration.db") as db:
         count = db.get_successful_count()
-        _logger.info("successful_downloads_count", extra={"count": count})
+        _logger.info("successful_downloads_count")
         typer.echo(f"Successfully downloaded tracks: {count}")
 
 
