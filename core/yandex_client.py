@@ -4,18 +4,20 @@ import json
 import logging
 import os
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
+from random import randint
 from typing import List, Optional
 
 from yandex_music import Client, Track
 
+from core.models.trackmetdata import TrackMetadata
 
-_TOKEN_ENV_VAR = "YANDEX_MUSIC_TOKEN"
-
+_YM_TOKEN = "YANDEX_MUSIC_TOKEN"
+_YM_PERIOD_BETWEEN_REQUESTS = "YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS"
 _logger = logging.getLogger("yandex_client")
 
-_client_singleton: Optional[Client] = None
+_SINGLETON: Optional[Client] = None
 
 def _album_genres_to_list(album) -> List[str]:
     """Extract genre names from album.genre into a list of strings."""
@@ -32,33 +34,18 @@ def _album_genres_to_list(album) -> List[str]:
     return [str(raw)] if raw else []
 
 
-@dataclass
-class TrackMetadata:
-    track_id: str
-    title: str
-    artists: List[str]
-    album: Optional[str]
-    album_artists: List[str]
-    year: Optional[int]
-    track_number: Optional[int]
-    disc_number: Optional[int]
-    duration_ms: Optional[int]
-    cover_uri: Optional[str]
-    genres: List[str]
-
-
 def _get_client() -> Client:
-    global _client_singleton
-    if _client_singleton is None:
-        token = os.getenv(_TOKEN_ENV_VAR)
+    global _SINGLETON
+    if _SINGLETON is None:
+        token = os.getenv(_YM_TOKEN)
         if not token:
             raise RuntimeError(
-                f"Environment variable '{_TOKEN_ENV_VAR}' is not set. "
+                f"Environment variable '{_YM_TOKEN}' is not set. "
                 "Set it to a valid Yandex Music access token. "
                 "See https://yandex-music.readthedocs.io/en/main/token.html for details."
             )
-        _client_singleton = Client(token).init()
-    return _client_singleton
+        _SINGLETON = Client(token).init()
+    return _SINGLETON
 
 
 def _build_metadata(track: Track) -> TrackMetadata:
@@ -102,9 +89,11 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
 
     for liked in likes:
         full_track = liked.fetch_track()
-        _logger.info(f"Built metadata for {full_track.title} - {full_track.artists}")
-        time.sleep(0.5) # To prevent rate-limiters
         result.append(_build_metadata(full_track))
+        _logger.info(f"Built metadata for {full_track.title}")
+        max_rnd = int(os.getenv(_YM_PERIOD_BETWEEN_REQUESTS))
+        time.sleep(randint(1, max_rnd)) # To prevent rate-limiters
+
 
     if cache_path is not None:
         cache_path.parent.mkdir(parents=True, exist_ok=True)

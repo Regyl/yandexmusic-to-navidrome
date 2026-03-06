@@ -8,13 +8,11 @@ from typing import Optional, Tuple
 
 import yt_dlp
 
-from core.yandex_client import TrackMetadata
+from core.models.trackmetdata import TrackMetadata
 from util.utils import DownloadError
 
 _YTDLP_DOWNLOAD_ENV = "YTDLP_DOWNLOAD_DIR"
-
-_ydl_singleton: Optional[yt_dlp.YoutubeDL] = None
-
+_SINGLETON: Optional[yt_dlp.YoutubeDL] = None
 
 def _get_download_dir() -> Path:
     dir_env = os.getenv(_YTDLP_DOWNLOAD_ENV)
@@ -27,8 +25,8 @@ def _get_download_dir() -> Path:
 
 
 def _get_ydl(timeout_seconds: int) -> yt_dlp.YoutubeDL:
-    global _ydl_singleton
-    if _ydl_singleton is None:
+    global _SINGLETON
+    if _SINGLETON is None:
         download_dir = _get_download_dir()
         outtmpl = str(download_dir / "%(id)s.%(ext)s")
         opts = {
@@ -50,8 +48,8 @@ def _get_ydl(timeout_seconds: int) -> yt_dlp.YoutubeDL:
         cookiefile = os.getenv("SOUNDCLOUD_COOKIES_FILE")
         if cookiefile and Path(cookiefile).exists():
             opts["cookiefile"] = cookiefile
-        _ydl_singleton = yt_dlp.YoutubeDL(opts)
-    return _ydl_singleton
+        _SINGLETON = yt_dlp.YoutubeDL(opts)
+    return _SINGLETON
 
 
 def download_track(track: TrackMetadata, timeout_seconds: int) -> Tuple[Path, str]:

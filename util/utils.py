@@ -7,7 +7,7 @@ from typing import Optional
 
 import requests
 
-from core.yandex_client import TrackMetadata
+from core.models.trackmetdata import TrackMetadata
 
 
 class DownloadError(Exception):
