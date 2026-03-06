@@ -10,8 +10,11 @@ from random import randint
 from typing import List, Optional
 
 from yandex_music import Client, Track
+from yandex_music.exceptions import NetworkError
 
 from core.models.trackmetdata import TrackMetadata
+
+_RETRY_DELAY_SECONDS = 60  # 1 minute
 
 _YM_TOKEN = "YANDEX_MUSIC_TOKEN"
 _YM_PERIOD_BETWEEN_REQUESTS = "YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS"
@@ -88,7 +91,7 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
     _logger.info(f"Found {len(likes)} liked tracks.")
 
     for liked in likes:
-        full_track = liked.fetch_track()
+        full_track = _fetch_track_with_retry(liked)
         result.append(_build_metadata(full_track))
         _logger.info(f"Built metadata for {full_track.title}")
         max_rnd = int(os.getenv(_YM_PERIOD_BETWEEN_REQUESTS))
@@ -105,16 +108,41 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
     return result
 
 
+def _fetch_track_with_retry(liked) -> Track:
+    """Fetch full track with infinite retry on NetworkError (5 min delay)."""
+    while True:
+        try:
+            return liked.fetch_track()
+        except NetworkError as e:
+            _logger.warning(
+                "NetworkError fetching track, retrying in %s minutes: %s",
+                _RETRY_DELAY_SECONDS // 60,
+                e,
+            )
+            time.sleep(_RETRY_DELAY_SECONDS)
+
+
 def fetch_failed_track_metadata(track_id: str) -> TrackMetadata:
     client = _get_client()
-    try:
-        tr = client.tracks([track_id])[0]
-        return _build_metadata(tr)
-    except Exception:
-        likes = client.users_likes_tracks()
-        for liked in likes:
-            full_track = liked.fetch_track()
-            real_id = getattr(full_track, "real_id", getattr(full_track, "id", None))
-            if str(real_id) == str(track_id):
-                return _build_metadata(full_track)
-        raise RuntimeError(f"Could not resolve failed track metadata for id={track_id!r}")
+    while True:
+        try:
+            tr = client.tracks([track_id])[0]
+            return _build_metadata(tr)
+        except NetworkError as e:
+            _logger.warning(
+                "NetworkError fetching track %s, retrying in %s minutes: %s",
+                track_id,
+                _RETRY_DELAY_SECONDS // 60,
+                e,
+            )
+            time.sleep(_RETRY_DELAY_SECONDS)
+        except Exception:
+            break
+
+    likes = client.users_likes_tracks()
+    for liked in likes:
+        full_track = _fetch_track_with_retry(liked)
+        real_id = getattr(full_track, "real_id", getattr(full_track, "id", None))
+        if str(real_id) == str(track_id):
+            return _build_metadata(full_track)
+    raise RuntimeError(f"Could not resolve failed track metadata for id={track_id!r}")
