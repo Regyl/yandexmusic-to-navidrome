@@ -6,12 +6,10 @@ from typing import Optional
 
 import requests
 
-from core.yandex_client import TrackMetadata
+from core.models.trackmetdata import TrackMetadata
 
-LRCLIB_SEARCH_URL = "https://lrclib.net/api/search"
-
-
-logger = logging.getLogger("navidrome_rw.lyrics")
+_LRCLIB_SEARCH_URL = "https://lrclib.net/api/search"
+_logger = logging.getLogger("navidrome_rw.lyrics")
 
 
 def _fetch_best_lrclib_entry(track: TrackMetadata) -> Optional[dict]:
@@ -25,9 +23,9 @@ def _fetch_best_lrclib_entry(track: TrackMetadata) -> Optional[dict]:
         params["duration"] = track.duration_ms / 1000.0
 
     try:
-        resp = requests.get(LRCLIB_SEARCH_URL, params=params, timeout=15)
+        resp = requests.get(_LRCLIB_SEARCH_URL, params=params, timeout=15)
         if resp.status_code != 200:
-            logger.debug("LRCLIB request failed", extra={"status": resp.status_code})
+            _logger.debug("LRCLIB request failed", extra={"status": resp.status_code})
             return None
         data = resp.json()
     except Exception:
@@ -55,7 +53,7 @@ def generate_lrc_for_track(audio_path: Path, track: TrackMetadata) -> None:
 
     entry = _fetch_best_lrclib_entry(track)
     if not entry:
-        logger.info(
+        _logger.info(
             "no_lyrics_found",
             extra={"title": track.title, "artists": ", ".join(track.artists)},
         )

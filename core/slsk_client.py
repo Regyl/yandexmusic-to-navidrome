@@ -9,15 +9,14 @@ from aioslsk.client import SoulSeekClient
 from aioslsk.search.model import SearchRequest, SearchResult
 from aioslsk.settings import CredentialsSettings, Settings, SharesSettings
 
+from core.models.trackmetdata import TrackMetadata
 from util.utils import DownloadError
-from core.yandex_client import TrackMetadata
-
 
 _SLSK_USER_ENV = "SLSK_USERNAME"
 _SLSK_PASS_ENV = "SLSK_PASSWORD"
 _SLSK_DOWNLOAD_ENV = "SLSK_DOWNLOAD_DIR"
 
-_client_singleton: Optional[SoulSeekClient] = None
+_SINGLETON: Optional[SoulSeekClient] = None
 
 
 def _get_settings() -> Settings:
@@ -83,7 +82,7 @@ async def _download_once(client: SoulSeekClient, track: TrackMetadata) -> Tuple[
 
 async def get_soulseek_client() -> SoulSeekClient:
     """Return the singleton Soulseek client, initializing it if needed."""
-    global _client_singleton
+    global _SINGLETON
     if _client_singleton is None:
         settings = _get_settings()
         _client_singleton = SoulSeekClient(settings)
@@ -94,7 +93,7 @@ async def get_soulseek_client() -> SoulSeekClient:
 
 async def shutdown_soulseek_client() -> None:
     """Stop and clear the singleton Soulseek client."""
-    global _client_singleton
+    global _SINGLETON
     if _client_singleton is not None:
         await _client_singleton.stop()
         _client_singleton = None

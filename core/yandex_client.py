@@ -4,18 +4,19 @@ import json
 import logging
 import os
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 from typing import List, Optional
 
 from yandex_music import Client, Track
 
+from core.models.trackmetdata import TrackMetadata
 
 _TOKEN_ENV_VAR = "YANDEX_MUSIC_TOKEN"
 
 _logger = logging.getLogger("yandex_client")
 
-_client_singleton: Optional[Client] = None
+_SINGLETON: Optional[Client] = None
 
 def _album_genres_to_list(album) -> List[str]:
     """Extract genre names from album.genre into a list of strings."""
@@ -32,24 +33,9 @@ def _album_genres_to_list(album) -> List[str]:
     return [str(raw)] if raw else []
 
 
-@dataclass
-class TrackMetadata:
-    track_id: str
-    title: str
-    artists: List[str]
-    album: Optional[str]
-    album_artists: List[str]
-    year: Optional[int]
-    track_number: Optional[int]
-    disc_number: Optional[int]
-    duration_ms: Optional[int]
-    cover_uri: Optional[str]
-    genres: List[str]
-
-
 def _get_client() -> Client:
-    global _client_singleton
-    if _client_singleton is None:
+    global _SINGLETON
+    if _SINGLETON is None:
         token = os.getenv(_TOKEN_ENV_VAR)
         if not token:
             raise RuntimeError(
@@ -57,8 +43,8 @@ def _get_client() -> Client:
                 "Set it to a valid Yandex Music access token. "
                 "See https://yandex-music.readthedocs.io/en/main/token.html for details."
             )
-        _client_singleton = Client(token).init()
-    return _client_singleton
+        _SINGLETON = Client(token).init()
+    return _SINGLETON
 
 
 def _build_metadata(track: Track) -> TrackMetadata:

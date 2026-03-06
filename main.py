@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
 import typer
@@ -12,9 +11,11 @@ from dotenv import load_dotenv
 from core import soundcloud_client
 from core.database import MigrationDB
 from core.lyrics import generate_lrc_for_track
+from core.models.appconfig import AppConfig
+from core.models.trackmetdata import TrackMetadata
 from core.slsk_client import download_track_with_retries as download_track_soulseek
 from core.tagging import embed_tags
-from core.yandex_client import TrackMetadata, fetch_failed_track_metadata, fetch_liked_tracks
+from core.yandex_client import fetch_failed_track_metadata, fetch_liked_tracks
 from core.ytdlp_client import download_track as download_track_ytdlp, \
     download_track_from_url as download_track_ytdlp_url
 from util.utils import (
@@ -28,12 +29,6 @@ from util.utils import (
 
 app = typer.Typer(help="Migrate Yandex Music liked tracks into a Navidrome library.")
 _logger = logging.getLogger("navidrome_rw")
-
-@dataclass
-class AppConfig:
-    music_root: Path
-    download_timeout_seconds: int = 600
-    max_download_retries: int = 3
 
 
 def _get_data_dir() -> Path:

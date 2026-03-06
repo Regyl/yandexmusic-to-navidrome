@@ -8,7 +8,7 @@ from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC, ID3, TALB, TCON, TDRC, TIT2, TPOS, TRCK, TPE1, TPE2, TCMP
 from mutagen.mp3 import MP3
 
-from core.yandex_client import TrackMetadata
+from core.models.trackmetdata import TrackMetadata
 
 # Navidrome preferred separator for multiple artists when using single-valued tag
 _ARTIST_SEP = " / "

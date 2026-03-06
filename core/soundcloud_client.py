@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import List
 from urllib.parse import urlparse
 
 import yt_dlp
 
-from core.yandex_client import TrackMetadata
+from core.models.soundcloudtrack import SoundCloudTrack
+from core.models.trackmetdata import TrackMetadata
 
 _logger = logging.getLogger("soundcloud_client")
 
@@ -44,12 +44,6 @@ def _sets_url_for_username(username: str) -> str:
     """Build soundcloud.com/USERNAME/sets URL (user's playlists page)."""
     uname = _canonical_username(username)
     return f"https://soundcloud.com/{uname}/sets"
-
-
-@dataclass
-class SoundCloudTrack:
-    metadata: TrackMetadata
-    url: str
 
 
 def _normalize_thumbnail(thumb: str | None) -> str | None:
