@@ -177,9 +177,7 @@ def _build_config() -> AppConfig:
     folder = os.getenv("NAVIDROME_FOLDER")
     if not folder:
         raise RuntimeError("NAVIDROME_FOLDER environment variable not set")
-    return AppConfig(
-        music_root=Path(folder),
-    )
+    return AppConfig(music_root=Path(folder))
 
 
 @app.command("ym-import")
@@ -189,15 +187,16 @@ def sync_command() -> None:
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
     run_sync_like_tracks(cfg)
+    _logger.info("finished ym-import")
 
 
 def run_import_soundcloud_likes(username: str, cfg: AppConfig) -> None:
-    """Fetch SoundCloud liked tracks (soundcloud.com/USERNAME/likes) and download each into NAVIDROME_FOLDER."""
+    """Fetch SoundCloud liked tracks and all user playlists for the given username, then download each into NAVIDROME_FOLDER."""
     data_dir = _get_data_dir()
     with MigrationDB(data_dir / "migration.db") as db:
-        tracks = soundcloud_client.fetch_liked_tracks(username)
+        tracks = soundcloud_client.fetch_all_tracks_for_user(username)
         _logger.info(
-            "fetched_soundcloud_likes",
+            "fetched_soundcloud_likes_and_playlists",
             extra={"username": username, "count": len(tracks)},
         )
         for sc_track in tracks:
@@ -213,14 +212,15 @@ def run_import_soundcloud_likes(username: str, cfg: AppConfig) -> None:
 def import_soundcloud_likes_command(
     username: str = typer.Argument(
         ...,
-        help="Your SoundCloud username (from your profile URL, e.g. soundcloud.com/yourname). Use cookies for private likes.",
+        help="SoundCloud username: imports liked tracks and all tracks from your playlists.",
     ),
 ) -> None:
-    """Import SoundCloud liked tracks (soundcloud.com/USERNAME/likes) into NAVIDROME_FOLDER."""
+    """Import SoundCloud liked tracks and all user playlists into NAVIDROME_FOLDER."""
     data_dir = _get_data_dir()
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
     run_import_soundcloud_likes(username, cfg)
+    _logger.info("finished soundcloud-import")
 
 def run_list_failed(cache_dir: Path) -> None:
     with MigrationDB(cache_dir / "migration.db") as db:
@@ -248,6 +248,7 @@ def retry_failed_command() -> None:
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
     run_retry_failed(cfg)
+    _logger.info("finished retry-failed")
 
 
 @app.command("list-failed")
@@ -259,16 +260,15 @@ def list_failed_command(
     run_list_failed(data_dir)
 
 
-def run_count_successful(cache_dir: Path) -> None:
-    with MigrationDB(cache_dir / "migration.db") as db:
+def run_count_successful(data_dir: Path) -> None:
+    with MigrationDB(data_dir / "migration.db") as db:
         count = db.get_successful_count()
         _logger.info("successful_downloads_count", extra={"count": count})
         typer.echo(f"Successfully downloaded tracks: {count}")
 
 
 @app.command("count-successful")
-def count_successful_command(
-) -> None:
+def count_successful_command() -> None:
     """Print the quantity of successfully downloaded tracks."""
     data_dir = _get_data_dir()
     configure_logging(data_dir / "migration.log")

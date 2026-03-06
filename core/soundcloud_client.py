@@ -16,25 +16,34 @@ _logger = logging.getLogger("soundcloud_client")
 # Prefix to avoid collision with Yandex track_id in migration DB
 _TRACK_ID_PREFIX = "sc_"
 
-# Base URL pattern for a user's likes (use actual username; "you" does not work with yt-dlp and returns 404)
-def _likes_url_for_username(username: str) -> str:
-    """Build soundcloud.com/USERNAME/likes URL. Accepts username or full URL."""
+def _canonical_username(username: str) -> str:
+    """Extract a single SoundCloud username (one path segment). Accepts username or profile URL."""
     s = (username or "").strip()
     if not s:
-        raise ValueError("SoundCloud username is required for likes (e.g. your profile name from the URL)")
-    # If they passed a URL, take the first path segment as username
+        raise ValueError("SoundCloud username is required (e.g. your profile name from the URL)")
     if "soundcloud.com" in s:
-        # e.g. https://soundcloud.com/foo/likes or https://soundcloud.com/foo
         parsed = urlparse(s if s.startswith("http") else "https://" + s)
-        parts = [p for p in parsed.path.strip("/").split("/") if p and p != "likes"]
+        parts = [p for p in parsed.path.strip("/").split("/") if p and p not in ("likes", "sets")]
         if not parts:
-            raise ValueError("Could not parse username from URL; use your SoundCloud username (e.g. from your profile URL)")
+            raise ValueError("Could not parse username from URL; use your SoundCloud username")
         s = parts[0]
-    # Sanitize: only allow one path segment (no slashes)
     s = s.split("/")[0].split("?")[0]
     if not s:
         raise ValueError("SoundCloud username is required")
-    return f"https://soundcloud.com/{s}/likes"
+    return s
+
+
+# Base URL pattern for a user's likes (use actual username; "you" does not work with yt-dlp and returns 404)
+def _likes_url_for_username(username: str) -> str:
+    """Build soundcloud.com/USERNAME/likes URL."""
+    uname = _canonical_username(username)
+    return f"https://soundcloud.com/{uname}/likes"
+
+
+def _sets_url_for_username(username: str) -> str:
+    """Build soundcloud.com/USERNAME/sets URL (user's playlists page)."""
+    uname = _canonical_username(username)
+    return f"https://soundcloud.com/{uname}/sets"
 
 
 @dataclass
@@ -128,3 +137,67 @@ def fetch_liked_tracks(username: str) -> List[SoundCloudTrack]:
     Use your actual username; 'you' does not work with yt-dlp (404). Set SOUNDCLOUD_COOKIES_FILE for private likes."""
     url = _likes_url_for_username(username)
     return fetch_playlist_tracks(url)
+
+
+def _fetch_tracks_from_user_playlists(username: str) -> List[SoundCloudTrack]:
+    """Fetch all tracks from all playlists of a user (soundcloud.com/USERNAME/sets). Deduplicates by track URL."""
+    sets_url = _sets_url_for_username(username)
+    opts = _build_ydl_opts()
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(sets_url, download=False)
+    if not info:
+        _logger.warning("yt-dlp returned no info for user sets %r", sets_url)
+        return []
+
+    entries = info.get("entries") or []
+    playlist_urls: List[str] = []
+    for ent in entries:
+        if ent is None or not isinstance(ent, dict):
+            continue
+        pl_url = ent.get("url") or ent.get("webpage_url")
+        if pl_url:
+            playlist_urls.append(pl_url)
+
+    if not playlist_urls:
+        _logger.info("No playlists found for user sets %r", sets_url)
+        return []
+
+    seen_urls: set[str] = set()
+    result: List[SoundCloudTrack] = []
+    for pl_url in playlist_urls:
+        try:
+            tracks = fetch_playlist_tracks(pl_url)
+            for sc_track in tracks:
+                if sc_track.url not in seen_urls:
+                    seen_urls.add(sc_track.url)
+                    result.append(sc_track)
+        except Exception as e:
+            _logger.warning("Skip playlist %r: %s", pl_url, e)
+
+    _logger.info("Fetched user playlists from %r: %d playlists, %d unique tracks", sets_url, len(playlist_urls), len(result))
+    return result
+
+
+def fetch_all_tracks_for_user(username: str) -> List[SoundCloudTrack]:
+    """Fetch liked tracks and all tracks from user's playlists; merge and deduplicate by track URL."""
+    uname = _canonical_username(username)
+    seen_urls: set[str] = set()
+    result: List[SoundCloudTrack] = []
+
+    # Liked tracks
+    try:
+        for sc_track in fetch_liked_tracks(uname):
+            if sc_track.url not in seen_urls:
+                seen_urls.add(sc_track.url)
+                result.append(sc_track)
+    except Exception as e:
+        _logger.warning("Could not fetch likes for %r: %s", uname, e)
+
+    # Tracks from user's playlists
+    for sc_track in _fetch_tracks_from_user_playlists(uname):
+        if sc_track.url not in seen_urls:
+            seen_urls.add(sc_track.url)
+            result.append(sc_track)
+
+    _logger.info("Total tracks for user %r: %d (likes + playlists, deduplicated)", uname, len(result))
+    return result

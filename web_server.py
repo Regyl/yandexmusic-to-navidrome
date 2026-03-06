@@ -218,7 +218,7 @@ def run_retry_failed_api() -> dict:
 
 @app.post("/api/run/soundcloud-import")
 def run_soundcloud_import_likes_api(body: RunSoundcloudImportLikesBody) -> dict:
-    """Start SoundCloud liked tracks import (soundcloud.com/USERNAME/likes). One job at a time."""
+    """Start SoundCloud import: liked tracks and all user playlists for the given username. One job at a time."""
     global _current_job
     username = (body.username or "").strip()
     if not username:

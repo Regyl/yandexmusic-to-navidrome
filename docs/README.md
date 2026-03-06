@@ -74,11 +74,18 @@ python -m main list-failed
 python -m main count-successful
 ```
 
-5. Импорт плейлиста с SoundCloud:
+5. Импорт всего лайкнутого/сохраненного (с публичным доступом) с SoundCloud:
 
 ```bash
-python -m main soundcloud-import "https://soundcloud.com/user/sets/playlist-name"
+python -m main soundcloud-import <your_nickname>
 ```
+
+6. Запуск webui:
+
+```bash
+python -m main web
+```
+
 
 Про возможные клиенты для подключения к navidrome с телефона/пк [тут](CLIENTS.md)
 
