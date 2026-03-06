@@ -3,19 +3,20 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from http.cookiejar import debug
 from pathlib import Path
 
 import typer
+import uvicorn
 from dotenv import load_dotenv
 
+from core import soundcloud_client
 from core.database import MigrationDB
 from core.lyrics import generate_lrc_for_track
 from core.slsk_client import download_track_with_retries as download_track_soulseek
 from core.tagging import embed_tags
 from core.yandex_client import TrackMetadata, fetch_failed_track_metadata, fetch_liked_tracks
-from core.ytdlp_client import download_track as download_track_ytdlp, download_track_from_url as download_track_ytdlp_url
-from core.soundcloud_client import fetch_playlist_tracks
+from core.ytdlp_client import download_track as download_track_ytdlp, \
+    download_track_from_url as download_track_ytdlp_url
 from util.utils import (
     DownloadError,
     build_album_directory,
@@ -24,10 +25,9 @@ from util.utils import (
     download_cover_image,
     ensure_directory,
 )
-import uvicorn
 
 app = typer.Typer(help="Migrate Yandex Music liked tracks into a Navidrome library.")
-_logger = logging.getLogger("yandexmusic_to_navidrome")
+_logger = logging.getLogger("navidrome_rw")
 
 @dataclass
 class AppConfig:
@@ -177,9 +177,7 @@ def _build_config() -> AppConfig:
     folder = os.getenv("NAVIDROME_FOLDER")
     if not folder:
         raise RuntimeError("NAVIDROME_FOLDER environment variable not set")
-    return AppConfig(
-        music_root=Path(folder),
-    )
+    return AppConfig(music_root=Path(folder))
 
 
 @app.command("ym-import")
@@ -189,16 +187,17 @@ def sync_command() -> None:
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
     run_sync_like_tracks(cfg)
+    _logger.info("finished ym-import")
 
 
-def run_import_soundcloud_playlist(playlist_url: str, cfg: AppConfig) -> None:
-    """Fetch SoundCloud playlist and download each track into NAVIDROME_FOLDER."""
+def run_import_soundcloud_likes(username: str, cfg: AppConfig) -> None:
+    """Fetch SoundCloud liked tracks and all user playlists for the given username, then download each into NAVIDROME_FOLDER."""
     data_dir = _get_data_dir()
     with MigrationDB(data_dir / "migration.db") as db:
-        tracks = fetch_playlist_tracks(playlist_url)
+        tracks = soundcloud_client.fetch_all_tracks_for_user(username)
         _logger.info(
-            "fetched_soundcloud_playlist",
-            extra={"url": playlist_url, "count": len(tracks)},
+            "fetched_soundcloud_likes_and_playlists",
+            extra={"username": username, "count": len(tracks)},
         )
         for sc_track in tracks:
             process_single_track(
@@ -210,17 +209,18 @@ def run_import_soundcloud_playlist(playlist_url: str, cfg: AppConfig) -> None:
 
 
 @app.command("soundcloud-import")
-def import_soundcloud_command(
-    playlist_url: str = typer.Argument(
+def import_soundcloud_likes_command(
+    username: str = typer.Argument(
         ...,
-        help="SoundCloud playlist/set URL, e.g. https://soundcloud.com/user/sets/playlist-name",
+        help="SoundCloud username: imports liked tracks and all tracks from your playlists.",
     ),
 ) -> None:
-    """Import a SoundCloud playlist: download all tracks into NAVIDROME_FOLDER."""
+    """Import SoundCloud liked tracks and all user playlists into NAVIDROME_FOLDER."""
     data_dir = _get_data_dir()
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
-    run_import_soundcloud_playlist(playlist_url, cfg)
+    run_import_soundcloud_likes(username, cfg)
+    _logger.info("finished soundcloud-import")
 
 def run_list_failed(cache_dir: Path) -> None:
     with MigrationDB(cache_dir / "migration.db") as db:
@@ -248,6 +248,7 @@ def retry_failed_command() -> None:
     configure_logging(data_dir / "migration.log")
     cfg = _build_config()
     run_retry_failed(cfg)
+    _logger.info("finished retry-failed")
 
 
 @app.command("list-failed")
@@ -259,16 +260,15 @@ def list_failed_command(
     run_list_failed(data_dir)
 
 
-def run_count_successful(cache_dir: Path) -> None:
-    with MigrationDB(cache_dir / "migration.db") as db:
+def run_count_successful(data_dir: Path) -> None:
+    with MigrationDB(data_dir / "migration.db") as db:
         count = db.get_successful_count()
         _logger.info("successful_downloads_count", extra={"count": count})
         typer.echo(f"Successfully downloaded tracks: {count}")
 
 
 @app.command("count-successful")
-def count_successful_command(
-) -> None:
+def count_successful_command() -> None:
     """Print the quantity of successfully downloaded tracks."""
     data_dir = _get_data_dir()
     configure_logging(data_dir / "migration.log")

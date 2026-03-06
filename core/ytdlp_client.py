@@ -47,6 +47,9 @@ def _get_ydl(timeout_seconds: int) -> yt_dlp.YoutubeDL:
                 }
             ],
         }
+        cookiefile = os.getenv("SOUNDCLOUD_COOKIES_FILE")
+        if cookiefile and Path(cookiefile).exists():
+            opts["cookiefile"] = cookiefile
         _ydl_singleton = yt_dlp.YoutubeDL(opts)
     return _ydl_singleton
 

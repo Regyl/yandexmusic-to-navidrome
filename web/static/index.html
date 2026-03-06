@@ -479,14 +479,14 @@
           <p class="run-desc">Retry previously failed downloads</p>
           <button type="button" class="btn btn-primary" id="btnRetryFailed">Run retry-failed</button>
         </div>
-        <div class="run-card run-card-wide">
+        <div class="run-card">
           <h3>SoundCloud Import</h3>
-          <p class="run-desc">Import a playlist by URL</p>
+          <p class="run-desc">Download liked tracks and all tracks from your playlists. Enter your SoundCloud username (from your profile URL).</p>
           <div class="run-row">
-            <label>Playlist URL</label>
-            <input type="url" id="soundcloudUrl" placeholder="https://soundcloud.com/..." />
+            <label>SoundCloud username</label>
+            <input type="text" id="soundcloudUsername" placeholder="your-username" />
           </div>
-          <button type="button" class="btn btn-primary" id="btnSoundcloud">Run soundcloud-import</button>
+          <button type="button" class="btn btn-primary" id="btnSoundcloudLikes">Run soundcloud-import</button>
         </div>
       </div>
     </section>
@@ -518,7 +518,7 @@
     const jobStatusEl = document.getElementById('jobStatus');
     const btnYm = document.getElementById('btnYmImport');
     const btnRetry = document.getElementById('btnRetryFailed');
-    const btnSc = document.getElementById('btnSoundcloud');
+    const btnScLikes = document.getElementById('btnSoundcloudLikes');
     const logView = document.getElementById('logView');
     const btnRefreshLogs = document.getElementById('btnRefreshLogs');
 
@@ -570,7 +570,7 @@
       const running = job && job.status === 'running';
       btnYm.disabled = running;
       btnRetry.disabled = running;
-      btnSc.disabled = running;
+      btnScLikes.disabled = running;
 
       if (running && !window._logsPollId) {
         window._logsPollId = setInterval(fetchLogs, 3000);
@@ -666,13 +666,13 @@
     btnRetry.addEventListener('click', () => {
       runCommand('/api/run/retry-failed', {});
     });
-    btnSc.addEventListener('click', () => {
-      const url = document.getElementById('soundcloudUrl').value.trim();
-      if (!url) {
-        alert('Enter a SoundCloud playlist URL');
+    btnScLikes.addEventListener('click', () => {
+      const username = document.getElementById('soundcloudUsername').value.trim();
+      if (!username) {
+        alert('Enter your SoundCloud username (from your profile URL)');
         return;
       }
-      runCommand('/api/run/soundcloud-import', { playlist_url: url });
+      runCommand('/api/run/soundcloud-import', { username });
     });
 
     btnRefreshLogs.addEventListener('click', fetchLogs);

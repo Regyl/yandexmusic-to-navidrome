@@ -122,9 +122,18 @@ def get_logs() -> dict:
         return {"content": None, "error": str(e)}
 
 
-def _run_job(command: str, playlist_url: str | None = None) -> None:
+def _run_job(
+    command: str,
+    soundcloud_username: str | None = None,
+) -> None:
     from util.utils import configure_logging
-    from main import _build_config, _get_data_dir as main_get_data_dir, run_import_soundcloud_playlist, run_retry_failed, run_sync_like_tracks
+    from main import (
+        _build_config,
+        _get_data_dir as main_get_data_dir,
+        run_import_soundcloud_likes,
+        run_retry_failed,
+        run_sync_like_tracks,
+    )
 
     global _current_job
     data_dir = main_get_data_dir()
@@ -135,8 +144,8 @@ def _run_job(command: str, playlist_url: str | None = None) -> None:
             run_sync_like_tracks(cfg)
         elif command == "retry-failed":
             run_retry_failed(cfg)
-        elif command == "soundcloud-import" and playlist_url:
-            run_import_soundcloud_playlist(playlist_url, cfg)
+        elif command == "soundcloud-import":
+            run_import_soundcloud_likes(soundcloud_username, cfg)
     except Exception as e:
         with _job_lock:
             if _current_job and _current_job.get("command") == command:
@@ -151,16 +160,8 @@ def _run_job(command: str, playlist_url: str | None = None) -> None:
             _current_job["error"] = None
 
 
-class RunYmImportBody(BaseModel):
-    pass
-
-
-class RunRetryFailedBody(BaseModel):
-    pass
-
-
-class RunSoundcloudImportBody(BaseModel):
-    playlist_url: str
+class RunSoundcloudImportLikesBody(BaseModel):
+    username: str
 
 
 @app.post("/api/run/ym-import")
@@ -216,12 +217,12 @@ def run_retry_failed_api() -> dict:
 
 
 @app.post("/api/run/soundcloud-import")
-def run_soundcloud_import_api(body: RunSoundcloudImportBody) -> dict:
-    """Start SoundCloud playlist import. One job at a time."""
+def run_soundcloud_import_likes_api(body: RunSoundcloudImportLikesBody) -> dict:
+    """Start SoundCloud import: liked tracks and all user playlists for the given username. One job at a time."""
     global _current_job
-    url = (body.playlist_url or "").strip()
-    if not url:
-        raise HTTPException(422, "playlist_url is required")
+    username = (body.username or "").strip()
+    if not username:
+        raise HTTPException(422, "username is required")
     with _job_lock:
         if _current_job and _current_job.get("status") == "running":
             raise HTTPException(409, "A job is already running")
@@ -231,11 +232,11 @@ def run_soundcloud_import_api(body: RunSoundcloudImportBody) -> dict:
             "started_at": datetime.now(timezone.utc).isoformat(),
             "finished_at": None,
             "error": None,
-            "playlist_url": url,
+            "playlist_url": None,
         }
     thread = threading.Thread(
         target=_run_job,
-        kwargs={"command": "soundcloud-import", "playlist_url": url},
+        kwargs={"command": "soundcloud-import", "soundcloud_username": username},
         daemon=True,
     )
     thread.start()

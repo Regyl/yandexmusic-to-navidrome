@@ -8,11 +8,10 @@ import requests
 
 from core.yandex_client import TrackMetadata
 
-
 LRCLIB_SEARCH_URL = "https://lrclib.net/api/search"
 
 
-logger = logging.getLogger("yandexmusic_to_navidrome.lyrics")
+logger = logging.getLogger("navidrome_rw.lyrics")
 
 
 def _fetch_best_lrclib_entry(track: TrackMetadata) -> Optional[dict]:
