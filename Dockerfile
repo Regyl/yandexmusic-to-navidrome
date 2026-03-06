@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY core/ core/
 COPY util/ util/
 COPY web/ web/
-COPY main.py web_server.py ./
+COPY main.py web_server.py cli_core.py ./
 
 # Default port (override with PORT env)
 ENV PORT=12080

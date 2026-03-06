@@ -1,6 +1,4 @@
-# Build and push regyl/navidrome-rw to Docker Hub.
-# Prerequisites: docker login (once), then run: .\build-push.ps1
-# Optional: .\build-push.ps1 -Tag "v1.0"
+# Specific tag: .\build-push.ps1 -Tag "v1.0"
 
 param(
     [string]$Tag = "latest"

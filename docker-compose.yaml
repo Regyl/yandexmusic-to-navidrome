@@ -14,7 +14,10 @@ services:
       - SLSK_USERNAME=RandomUserName # change this
       - SLSK_PASSWORD=RandomPassword # change this
       - YANDEX_MUSIC_TOKEN=MegaToken # change this
-      - YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS=3
+      - YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS=5
     volumes:
-      - /home/navidrome:/navidrome
+      - navidrome_volume:/navidrome
     restart: unless-stopped
+
+volumes:
+  navidrome_volume:
