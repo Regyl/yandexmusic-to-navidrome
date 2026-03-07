@@ -83,20 +83,20 @@ async def _download_once(client: SoulSeekClient, track: TrackMetadata) -> Tuple[
 async def get_soulseek_client() -> SoulSeekClient:
     """Return the singleton Soulseek client, initializing it if needed."""
     global _SINGLETON
-    if _client_singleton is None:
+    if _SINGLETON is None:
         settings = _get_settings()
-        _client_singleton = SoulSeekClient(settings)
-        await _client_singleton.start()
-        await _client_singleton.login()
-    return _client_singleton
+        _SINGLETON = SoulSeekClient(settings)
+        await _SINGLETON.start()
+        await _SINGLETON.login()
+    return _SINGLETON
 
 
 async def shutdown_soulseek_client() -> None:
     """Stop and clear the singleton Soulseek client."""
     global _SINGLETON
-    if _client_singleton is not None:
-        await _client_singleton.stop()
-        _client_singleton = None
+    if _SINGLETON is not None:
+        await _SINGLETON.stop()
+        _SINGLETON = None
 
 
 async def download_track(

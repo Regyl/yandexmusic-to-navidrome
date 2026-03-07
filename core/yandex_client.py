@@ -7,16 +7,17 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 from random import randint
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from yandex_music import Client, Track
 from yandex_music.exceptions import NetworkError
 
 from core.models.trackmetdata import TrackMetadata
+from util.utils import DownloadError
 
 _RETRY_DELAY_SECONDS = 60  # 1 minute
-
 _YM_TOKEN = "YANDEX_MUSIC_TOKEN"
+_YM_DOWNLOAD_ENV = "YANDEX_MUSIC_DOWNLOAD_DIR"
 _YM_PERIOD_BETWEEN_REQUESTS = "YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS"
 _logger = logging.getLogger("yandex_client")
 
@@ -146,3 +147,55 @@ def fetch_failed_track_metadata(track_id: str) -> TrackMetadata:
         if str(real_id) == str(track_id):
             return _build_metadata(full_track)
     raise RuntimeError(f"Could not resolve failed track metadata for id={track_id!r}")
+
+
+def _get_download_dir() -> Path:
+    dir_env = os.getenv(_YM_DOWNLOAD_ENV)
+    download_dir = Path(dir_env)
+    download_dir.mkdir(parents=True, exist_ok=True)
+    return download_dir
+
+
+def _best_download_info(track: Track):
+    """Choose best DownloadInfo: prefer flac, then highest bitrate mp3."""
+    infos = track.get_download_info()
+    if not infos:
+        raise DownloadError("No download info for track")
+    # Prefer flac, then mp3 by bitrate descending
+    def key(d):
+        return (0 if (getattr(d, "codec", "") or "").lower() == "flac" else 1, -(getattr(d, "bitrate_in_kbps", 0) or 0))
+    return max(infos, key=key)
+
+
+def download_track(
+    track: TrackMetadata,
+    max_retries: int,
+) -> Tuple[Path, str]:
+    """Download a single track from Yandex Music. Returns (path, extension)."""
+    last_error: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            client = _get_client()
+            tracks = client.tracks([track.track_id])
+            if not tracks:
+                raise DownloadError(f"Track not found: {track.track_id}")
+            ym_track = tracks[0]
+            info = _best_download_info(ym_track)
+            codec = (getattr(info, "codec", None) or "mp3").lower()
+            download_dir = _get_download_dir()
+            path = download_dir / f"{track.track_id}.{codec}"
+            info.download(str(path))
+            if not path.exists():
+                raise DownloadError(f"Download finished but file missing: {path}")
+            return path, codec
+        except NetworkError as e:
+            last_error = e
+            _logger.warning("NetworkError downloading track, retry %s/%s: %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                time.sleep(_RETRY_DELAY_SECONDS)
+        except Exception as e:
+            last_error = e
+            _logger.warning("Error downloading track, retry %s/%s: %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                time.sleep(_RETRY_DELAY_SECONDS)
+    raise DownloadError(str(last_error) if last_error else "Yandex Music download failed")

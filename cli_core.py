@@ -11,9 +11,12 @@ from core.database import MigrationDB
 from core.lyrics import generate_lrc_for_track
 from core.models.appconfig import AppConfig
 from core.models.trackmetdata import TrackMetadata
-from core.slsk_client import download_track_with_retries as download_track_soulseek
 from core.tagging import embed_tags
-from core.yandex_client import fetch_failed_track_metadata, fetch_liked_tracks
+from core.yandex_client import (
+    download_track as download_track_yandex,
+    fetch_failed_track_metadata,
+    fetch_liked_tracks,
+)
 from core.ytdlp_client import (
     download_track as download_track_ytdlp,
     download_track_from_url as download_track_ytdlp_url,
@@ -89,7 +92,7 @@ def process_single_track(
                     raise Exception(
                         "The current session has been rate-limited by YouTube. Retry after an hour"
                     )
-                download_path, actual_extension = download_track_soulseek(
+                download_path, actual_extension = download_track_yandex(
                     track=track,
                     timeout_seconds=cfg.download_timeout_seconds,
                     max_retries=cfg.max_download_retries,
