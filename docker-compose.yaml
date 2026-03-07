@@ -11,6 +11,7 @@ services:
       - NAVIDROME_FOLDER=/navidrome/transfer
       - YTDLP_DOWNLOAD_DIR=/navidrome/navidromerw/tmp/ytdlp
       - SLSK_DOWNLOAD_DIR=/navidrome/navidromerw/tmp/slskd
+      - YANDEX_MUSIC_DOWNLOAD_DIR=/navidrome/navidromerw/tmp/ym
       - SLSK_USERNAME=RandomUserName # change this
       - SLSK_PASSWORD=RandomPassword # change this
       - YANDEX_MUSIC_TOKEN=MegaToken # change this
