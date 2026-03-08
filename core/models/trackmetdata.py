@@ -17,3 +17,9 @@ class TrackMetadata:
     duration_ms: Optional[int]
     cover_uri: Optional[str]
     genres: List[str]
+    language: Optional[str] = None  # tlan, language
+    mood: Optional[List[str]] = None  # tmoo, mood (split: ; / ,)
+    release_country: Optional[str] = None  # releasecountry, musicbrainz/album release country
+    releasetype: Optional[str] = None  # releasetype, musicbrainz_albumtype (album, ep, single, compilation)
+    style: Optional[str] = None  # grouping or style (album style)
+    source: Optional[str] = None  # TXXX:source - where track was sourced from

@@ -52,9 +52,22 @@ def _get_client() -> Client:
     return _SINGLETON
 
 
+def _first_region(album) -> Optional[str]:
+    """First region from regions or available_regions (ISO 3166-1 alpha-2, e.g. RU, US)."""
+    if album is None:
+        return None
+    regions = getattr(album, "regions", None) or getattr(album, "available_regions", None)
+    if regions and isinstance(regions, list) and len(regions) > 0:
+        r = regions[0]
+        return str(r) if r else None
+    return None
+
+
 def _build_metadata(track: Track) -> TrackMetadata:
     album = track.albums[0] if track.albums else None
     track_position = getattr(track, "track_position", None)
+    album_type = getattr(album, "type", None) if album else None
+    releasetype = str(album_type) if album_type else None
 
     return TrackMetadata(
         track_id=str(getattr(track, "id", "")),
@@ -70,6 +83,9 @@ def _build_metadata(track: Track) -> TrackMetadata:
             getattr(album, "cover_uri", None) if album else None
         ),
         genres=_album_genres_to_list(album),
+        releasetype=releasetype,
+        release_country=_first_region(album),
+        source="Yandex Music",
     )
 
 
@@ -80,11 +96,14 @@ def fetch_liked_tracks(
         data = json.loads(cache_path.read_text(encoding="utf-8"))
         result = []
         for item in data:
+            item = dict(item)
             # Backward compat: old cache had "genre" (str), now we use "genres" (list)
             if "genres" not in item and "genre" in item:
-                item = dict(item)
                 item["genres"] = [item["genre"]] if item.get("genre") else []
                 del item["genre"]
+            # Backward compat: old cache lacks language, mood, release_country, releasetype, style, source
+            for k in ("language", "mood", "release_country", "releasetype", "style", "source"):
+                item.setdefault(k, None)
             result.append(TrackMetadata(**item))
         return result[:limit] if limit is not None else result
 

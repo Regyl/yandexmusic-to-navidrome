@@ -5,7 +5,7 @@ from typing import Optional
 
 from mutagen import File
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC, ID3, TALB, TCON, TDRC, TIT2, TPOS, TRCK, TPE1, TPE2, TCMP
+from mutagen.id3 import APIC, ID3, TALB, TCON, TDRC, TIT2, TLAN, TMOO, TPOS, TRCK, TPE1, TPE2, TCMP, TXXX
 from mutagen.mp3 import MP3
 
 from core.models.trackmetdata import TrackMetadata
@@ -56,6 +56,23 @@ def _embed_mp3_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byte
         audio.tags["TCON"] = TCON(encoding=3, text=track.genres)
     if _is_compilation(track):
         audio.tags["TCMP"] = TCMP(encoding=3, text="1")
+    if track.language:
+        audio.tags["TLAN"] = TLAN(encoding=3, text=[track.language])
+    if track.mood:
+        mood_str = "; ".join(track.mood) if isinstance(track.mood, list) else str(track.mood)
+        audio.tags["TMOO"] = TMOO(encoding=3, text=[mood_str])
+    if track.release_country:
+        audio.tags["TXXX:MusicBrainz Album Release Country"] = TXXX(
+            encoding=3, desc="MusicBrainz Album Release Country", text=[track.release_country]
+        )
+    if track.releasetype:
+        audio.tags["TXXX:MusicBrainz Album Type"] = TXXX(
+            encoding=3, desc="MusicBrainz Album Type", text=[track.releasetype]
+        )
+    if track.style:
+        audio.tags["TXXX:style"] = TXXX(encoding=3, desc="style", text=[track.style])
+    if track.source:
+        audio.tags["TXXX:source"] = TXXX(encoding=3, desc="source", text=[track.source])
 
     if cover_bytes:
         audio.tags["APIC"] = APIC(
@@ -93,6 +110,19 @@ def _embed_flac_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[byt
         audio["genre"] = track.genres
     if _is_compilation(track):
         audio["compilation"] = "1"
+    if track.language:
+        audio["language"] = track.language
+    if track.mood:
+        mood_val = track.mood if isinstance(track.mood, list) else [str(track.mood)]
+        audio["mood"] = mood_val
+    if track.release_country:
+        audio["releasecountry"] = track.release_country
+    if track.releasetype:
+        audio["releasetype"] = track.releasetype
+    if track.style:
+        audio["style"] = track.style
+    if track.source:
+        audio["source"] = track.source
 
     if cover_bytes:
         pic = Picture()
@@ -138,5 +168,18 @@ def embed_tags(path: Path, track: TrackMetadata, cover_bytes: Optional[bytes]) -
             audio["genre"] = track.genres
         if _is_compilation(track):
             audio["compilation"] = "1"
+        if track.language:
+            audio["language"] = track.language
+        if track.mood:
+            mood_val = track.mood if isinstance(track.mood, list) else [str(track.mood)]
+            audio["mood"] = mood_val
+        if track.release_country:
+            audio["releasecountry"] = track.release_country
+        if track.releasetype:
+            audio["releasetype"] = track.releasetype
+        if track.style:
+            audio["style"] = track.style
+        if track.source:
+            audio["source"] = track.source
         audio.save()
 

@@ -72,6 +72,19 @@ def _entry_to_metadata(entry: dict, index: int) -> TrackMetadata:
     # Use track's source album from SoundCloud when present; never use playlist/set name.
     album = entry.get("album") or None
 
+    genres_raw = entry.get("genre") or entry.get("genres")
+    genres = (
+        genres_raw
+        if isinstance(genres_raw, list)
+        else [genres_raw] if genres_raw else []
+    )
+    language = entry.get("language") or entry.get("lang")
+    mood_raw = entry.get("mood")
+    mood = (
+        mood_raw
+        if isinstance(mood_raw, list)
+        else [mood_raw] if mood_raw else None
+    )
     return TrackMetadata(
         track_id=track_id,
         title=title,
@@ -83,7 +96,10 @@ def _entry_to_metadata(entry: dict, index: int) -> TrackMetadata:
         disc_number=None,
         duration_ms=duration_ms,
         cover_uri=_normalize_thumbnail(thumb),
-        genres=[],
+        genres=genres,
+        language=str(language) if language else None,
+        mood=mood,
+        source="SoundCloud",
     )
 
 
