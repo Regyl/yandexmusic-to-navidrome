@@ -32,6 +32,16 @@ def sync_command() -> None:
     _logger.info("finished ym-import")
 
 
+@app.command("ym-import-test")
+def ym_import_test_command() -> None:
+    """Test Yandex Music import: process only one track and upload into Navidrome target folder."""
+    data_dir = _get_data_dir()
+    configure_logging(data_dir / "migration.log")
+    cfg = _build_config()
+    run_sync_like_tracks(cfg, limit=1)
+    _logger.info("finished ym-import-test")
+
+
 @app.command("soundcloud-import")
 def import_soundcloud_likes_command(
     username: str = typer.Argument(
@@ -45,6 +55,21 @@ def import_soundcloud_likes_command(
     cfg = _build_config()
     run_import_soundcloud_likes(username, cfg)
     _logger.info("finished soundcloud-import")
+
+
+@app.command("soundcloud-import-test")
+def soundcloud_import_test_command(
+    username: str = typer.Argument(
+        ...,
+        help="SoundCloud username: test import of one track.",
+    ),
+) -> None:
+    """Test SoundCloud import: process only one track and upload into Navidrome target folder."""
+    data_dir = _get_data_dir()
+    configure_logging(data_dir / "migration.log")
+    cfg = _build_config()
+    run_import_soundcloud_likes(username, cfg, limit=1)
+    _logger.info("finished soundcloud-import-test")
 
 
 @app.command("retry-failed")

@@ -172,8 +172,10 @@ def _fetch_tracks_from_user_playlists(username: str) -> List[SoundCloudTrack]:
     return result
 
 
-def fetch_all_tracks_for_user(username: str) -> List[SoundCloudTrack]:
-    """Fetch liked tracks and all tracks from user's playlists; merge and deduplicate by track URL."""
+def fetch_all_tracks_for_user(
+    username: str, limit: int | None = None
+) -> List[SoundCloudTrack]:
+    """Fetch liked tracks and all tracks from user's playlists; merge and deduplicate by track URL. If limit is set, return at most that many tracks."""
     uname = _canonical_username(username)
     seen_urls: set[str] = set()
     result: List[SoundCloudTrack] = []
@@ -181,6 +183,8 @@ def fetch_all_tracks_for_user(username: str) -> List[SoundCloudTrack]:
     # Liked tracks
     try:
         for sc_track in fetch_liked_tracks(uname):
+            if limit is not None and len(result) >= limit:
+                break
             if sc_track.url not in seen_urls:
                 seen_urls.add(sc_track.url)
                 result.append(sc_track)
@@ -188,10 +192,13 @@ def fetch_all_tracks_for_user(username: str) -> List[SoundCloudTrack]:
         _logger.warning("Could not fetch likes for %r: %s", uname, e)
 
     # Tracks from user's playlists
-    for sc_track in _fetch_tracks_from_user_playlists(uname):
-        if sc_track.url not in seen_urls:
-            seen_urls.add(sc_track.url)
-            result.append(sc_track)
+    if limit is None or len(result) < limit:
+        for sc_track in _fetch_tracks_from_user_playlists(uname):
+            if limit is not None and len(result) >= limit:
+                break
+            if sc_track.url not in seen_urls:
+                seen_urls.add(sc_track.url)
+                result.append(sc_track)
 
     _logger.info("Total tracks for user %r: %d (likes + playlists, deduplicated)", uname, len(result))
-    return result
+    return result[:limit] if limit is not None else result

@@ -374,6 +374,23 @@
       color: #fff;
     }
 
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+    }
+
+    .run-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .run-buttons .btn {
+      margin-top: 0;
+    }
+
     .logs-section {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -472,7 +489,10 @@
         <div class="run-card">
           <h3>Yandex Music Import</h3>
           <p class="run-desc">Download liked tracks from Yandex Music</p>
-          <button type="button" class="btn btn-primary" id="btnYmImport">Run</button>
+          <div class="run-buttons">
+            <button type="button" class="btn btn-primary" id="btnYmImport">Run</button>
+            <button type="button" class="btn btn-secondary" id="btnYmImportTest">Test</button>
+          </div>
         </div>
         <div class="run-card">
           <h3>Retry failed</h3>
@@ -486,7 +506,10 @@
             <label for="soundcloudUsername">SoundCloud username</label>
             <input type="text" id="soundcloudUsername" placeholder="Your username"/>
           </div>
-          <button type="button" class="btn btn-primary" id="btnSoundcloudLikes">Run</button>
+          <div class="run-buttons">
+            <button type="button" class="btn btn-primary" id="btnSoundcloudLikes">Run</button>
+            <button type="button" class="btn btn-secondary" id="btnSoundcloudLikesTest">Test</button>
+          </div>
         </div>
       </div>
     </section>
@@ -517,8 +540,10 @@
     const failedList = document.getElementById('failedList');
     const jobStatusEl = document.getElementById('jobStatus');
     const btnYm = document.getElementById('btnYmImport');
+    const btnYmTest = document.getElementById('btnYmImportTest');
     const btnRetry = document.getElementById('btnRetryFailed');
     const btnScLikes = document.getElementById('btnSoundcloudLikes');
+    const btnScLikesTest = document.getElementById('btnSoundcloudLikesTest');
     const logView = document.getElementById('logView');
     const btnRefreshLogs = document.getElementById('btnRefreshLogs');
 
@@ -569,8 +594,10 @@
 
       const running = job && job.status === 'running';
       btnYm.disabled = running;
+      btnYmTest.disabled = running;
       btnRetry.disabled = running;
       btnScLikes.disabled = running;
+      btnScLikesTest.disabled = running;
 
       if (running && !window._logsPollId) {
         window._logsPollId = setInterval(fetchLogs, 3000);
@@ -663,6 +690,9 @@
     btnYm.addEventListener('click', () => {
       runCommand('/api/run/ym-import', {});
     });
+    btnYmTest.addEventListener('click', () => {
+      runCommand('/api/run/ym-import-test', {});
+    });
     btnRetry.addEventListener('click', () => {
       runCommand('/api/run/retry-failed', {});
     });
@@ -673,6 +703,14 @@
         return;
       }
       runCommand('/api/run/soundcloud-import', { username });
+    });
+    btnScLikesTest.addEventListener('click', () => {
+      const username = document.getElementById('soundcloudUsername').value.trim();
+      if (!username) {
+        alert('Enter your SoundCloud username (from your profile URL)');
+        return;
+      }
+      runCommand('/api/run/soundcloud-import-test', { username });
     });
 
     btnRefreshLogs.addEventListener('click', fetchLogs);

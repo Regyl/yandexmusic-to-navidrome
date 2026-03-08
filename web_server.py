@@ -142,10 +142,14 @@ def _run_job(
     try:
         if command == "ym-import":
             run_sync_like_tracks(cfg)
+        elif command == "ym-import-test":
+            run_sync_like_tracks(cfg, limit=1)
         elif command == "retry-failed":
             run_retry_failed(cfg)
         elif command == "soundcloud-import":
             run_import_soundcloud_likes(soundcloud_username, cfg)
+        elif command == "soundcloud-import-test":
+            run_import_soundcloud_likes(soundcloud_username, cfg, limit=1)
     except Exception as e:
         with _job_lock:
             if _current_job and _current_job.get("command") == command:
@@ -182,6 +186,32 @@ def run_ym_import() -> dict:
     thread = threading.Thread(
         target=_run_job,
         kwargs={"command": "ym-import"},
+        daemon=True,
+    )
+    thread.start()
+    with _job_lock:
+        job = _current_job
+    return {"ok": True, "job": _job_to_response(job)}
+
+
+@app.post("/api/run/ym-import-test")
+def run_ym_import_test_api() -> dict:
+    """Test Yandex Music import: process only one track and upload into Navidrome target folder."""
+    global _current_job
+    with _job_lock:
+        if _current_job and _current_job.get("status") == "running":
+            raise HTTPException(409, "A job is already running")
+        _current_job = {
+            "command": "ym-import-test",
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "error": None,
+            "playlist_url": None,
+        }
+    thread = threading.Thread(
+        target=_run_job,
+        kwargs={"command": "ym-import-test"},
         daemon=True,
     )
     thread.start()
@@ -237,6 +267,35 @@ def run_soundcloud_import_likes_api(body: RunSoundcloudImportLikesBody) -> dict:
     thread = threading.Thread(
         target=_run_job,
         kwargs={"command": "soundcloud-import", "soundcloud_username": username},
+        daemon=True,
+    )
+    thread.start()
+    with _job_lock:
+        job = _current_job
+    return {"ok": True, "job": _job_to_response(job)}
+
+
+@app.post("/api/run/soundcloud-import-test")
+def run_soundcloud_import_test_api(body: RunSoundcloudImportLikesBody) -> dict:
+    """Test SoundCloud import: process only one track and upload into Navidrome target folder."""
+    global _current_job
+    username = (body.username or "").strip()
+    if not username:
+        raise HTTPException(422, "username is required")
+    with _job_lock:
+        if _current_job and _current_job.get("status") == "running":
+            raise HTTPException(409, "A job is already running")
+        _current_job = {
+            "command": "soundcloud-import-test",
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "error": None,
+            "playlist_url": None,
+        }
+    thread = threading.Thread(
+        target=_run_job,
+        kwargs={"command": "soundcloud-import-test", "soundcloud_username": username},
         daemon=True,
     )
     thread.start()

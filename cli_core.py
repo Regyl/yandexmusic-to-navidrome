@@ -128,11 +128,13 @@ def process_single_track(
     db.mark_success(track.track_id, str(final_audio_dest))
 
 
-def run_sync_like_tracks(cfg: AppConfig) -> None:
+def run_sync_like_tracks(cfg: AppConfig, limit: int | None = None) -> None:
+    """Sync liked tracks from Yandex Music. If limit is set, process only that many tracks (for testing)."""
     data_dir = _get_data_dir()
     with MigrationDB(data_dir / "migration.db") as db:
         liked_tracks = fetch_liked_tracks(
-            cache_path=data_dir / "migration_liked_tracks.json"
+            cache_path=data_dir / "migration_liked_tracks.json",
+            limit=limit,
         )
         _logger.info(f"fetched_yandex_liked_tracks: {len(liked_tracks)}")
 
@@ -163,12 +165,15 @@ def _build_config() -> AppConfig:
     return AppConfig(music_root=Path(folder))
 
 
-def run_import_soundcloud_likes(username: str, cfg: AppConfig) -> None:
-    """Fetch SoundCloud liked tracks and all user playlists for the given username, then download each into NAVIDROME_FOLDER."""
+def run_import_soundcloud_likes(
+    username: str, cfg: AppConfig, limit: int | None = None
+) -> None:
+    """Fetch SoundCloud liked tracks and all user playlists for the given username, then download each into NAVIDROME_FOLDER. If limit is set, process only that many tracks (for testing)."""
     data_dir = _get_data_dir()
     with MigrationDB(data_dir / "migration.db") as db:
-        tracks = soundcloud_client.fetch_all_tracks_for_user(username)
+        tracks = soundcloud_client.fetch_all_tracks_for_user(username, limit=limit)
         _logger.info(f"fetched_soundcloud_likes_and_playlists: {len(tracks)}")
+
         for sc_track in tracks:
             process_single_track(
                 sc_track.metadata,

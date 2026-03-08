@@ -73,7 +73,9 @@ def _build_metadata(track: Track) -> TrackMetadata:
     )
 
 
-def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]:
+def fetch_liked_tracks(
+    cache_path: Optional[Path] = None, limit: Optional[int] = None
+) -> list[TrackMetadata]:
     if cache_path is not None and cache_path.exists():
         data = json.loads(cache_path.read_text(encoding="utf-8"))
         result = []
@@ -84,7 +86,7 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
                 item["genres"] = [item["genre"]] if item.get("genre") else []
                 del item["genre"]
             result.append(TrackMetadata(**item))
-        return result
+        return result[:limit] if limit is not None else result
 
     client = _get_client()
     likes = client.users_likes_tracks()
@@ -92,14 +94,15 @@ def fetch_liked_tracks(cache_path: Optional[Path] = None) -> list[TrackMetadata]
     _logger.info(f"Found {len(likes)} liked tracks.")
 
     for liked in likes:
+        if limit is not None and len(result) >= limit:
+            break
         full_track = _fetch_track_with_retry(liked)
         result.append(_build_metadata(full_track))
         _logger.info(f"Built metadata for {full_track.title}")
         max_rnd = int(os.getenv(_YM_PERIOD_BETWEEN_REQUESTS))
-        time.sleep(randint(1, max_rnd)) # To prevent rate-limiters
+        time.sleep(randint(1, max_rnd))  # To prevent rate-limiters
 
-
-    if cache_path is not None:
+    if cache_path is not None and limit is None:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(
             json.dumps([asdict(t) for t in result], ensure_ascii=False, indent=2),
