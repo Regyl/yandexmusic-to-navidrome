@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -125,12 +125,14 @@ def get_logs() -> dict:
 def _run_job(
     command: str,
     soundcloud_username: str | None = None,
+    redownload_playlist_name: str | None = None,
 ) -> None:
     from util.utils import configure_logging
-    from main import (
+    from cli_core import (
         _build_config,
         _get_data_dir as main_get_data_dir,
         run_import_soundcloud_likes,
+        run_redownload_playlist,
         run_retry_failed,
         run_sync_like_tracks,
     )
@@ -150,6 +152,8 @@ def _run_job(
             run_import_soundcloud_likes(soundcloud_username, cfg)
         elif command == "soundcloud-import-test":
             run_import_soundcloud_likes(soundcloud_username, cfg, limit=1)
+        elif command == "redownload-playlist":
+            run_redownload_playlist(redownload_playlist_name or "_REDOWNLOAD", cfg)
     except Exception as e:
         with _job_lock:
             if _current_job and _current_job.get("command") == command:
@@ -166,6 +170,10 @@ def _run_job(
 
 class RunSoundcloudImportLikesBody(BaseModel):
     username: str
+
+
+class RunRedownloadPlaylistBody(BaseModel):
+    playlist_name: str = "_REDOWNLOAD"
 
 
 @app.post("/api/run/ym-import")
@@ -296,6 +304,35 @@ def run_soundcloud_import_test_api(body: RunSoundcloudImportLikesBody) -> dict:
     thread = threading.Thread(
         target=_run_job,
         kwargs={"command": "soundcloud-import-test", "soundcloud_username": username},
+        daemon=True,
+    )
+    thread.start()
+    with _job_lock:
+        job = _current_job
+    return {"ok": True, "job": _job_to_response(job)}
+
+
+@app.post("/api/run/redownload-playlist")
+def run_redownload_playlist_api(
+    body: RunRedownloadPlaylistBody | None = Body(default=None),
+) -> dict:
+    """Fetch tracks from Navidrome playlist (default: _REDOWNLOAD), redownload from Yandex Music, replace files."""
+    global _current_job
+    playlist_name = (body.playlist_name if body else "_REDOWNLOAD") or "_REDOWNLOAD"
+    with _job_lock:
+        if _current_job and _current_job.get("status") == "running":
+            raise HTTPException(409, "A job is already running")
+        _current_job = {
+            "command": "redownload-playlist",
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "error": None,
+            "playlist_url": None,
+        }
+    thread = threading.Thread(
+        target=_run_job,
+        kwargs={"command": "redownload-playlist", "redownload_playlist_name": playlist_name},
         daemon=True,
     )
     thread.start()

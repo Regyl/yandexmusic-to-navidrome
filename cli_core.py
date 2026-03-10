@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from core import soundcloud_client
+from core import navidrome_client, soundcloud_client
 from core.database import MigrationDB
 from core.lyrics import generate_lrc_for_track
 from core.models.appconfig import AppConfig
@@ -126,6 +126,92 @@ def process_single_track(
         _logger.warning(f"lyrics_failed for {track.title}")
 
     db.mark_success(track.track_id, str(final_audio_dest))
+
+
+def process_single_track_replace(
+    track: TrackMetadata,
+    cfg: AppConfig,
+    db: MigrationDB,
+    existing_path: Path,
+) -> None:
+    """Download track from Yandex Music and replace the existing file at existing_path.
+    Skips SoundCloud tracks (track_id starting with 'sc_'). Deletes old file before writing new one.
+    """
+    if track.track_id.startswith("sc_"):
+        _logger.info(f"skip_soundcloud_track for {track.title} (not from Yandex)")
+        return
+    album_dir = existing_path.parent
+    ensure_directory(album_dir)
+    try:
+        try:
+            download_path, actual_extension = download_track_ytdlp(
+                track=track,
+                timeout_seconds=cfg.download_timeout_seconds,
+            )
+        except DownloadError as e:
+            _logger.warning("download_error from yt-dlp: " + str(e))
+            if "The current session has been rate-limited by YouTube" in str(e):
+                raise Exception(
+                    "The current session has been rate-limited by YouTube. Retry after an hour"
+                )
+            download_path, actual_extension = download_track_yandex(
+                track=track,
+                max_retries=cfg.max_download_retries,
+            )
+    except (DownloadError, RuntimeError) as exc:
+        _logger.error(f"redownload_failed for {track.title}: {exc}")
+        db.mark_failed(track.track_id, str(exc))
+        return
+    _logger.info(f"redownload_successful for {track.title}")
+    final_audio_dest = album_dir / build_track_filename(track, extension=actual_extension)
+    if existing_path.exists():
+        existing_path.unlink()
+        _logger.info(f"removed_old_file {existing_path}")
+    download_path.replace(final_audio_dest)
+    cover_bytes = download_cover_image(track)
+    cover_path = album_dir / "album-cover.jpg"
+    if cover_bytes and not cover_path.exists():
+        cover_path.write_bytes(cover_bytes)
+    try:
+        embed_tags(final_audio_dest, track, cover_bytes)
+    except Exception:
+        _logger.warning(f"tagging_failed for {track.title}")
+    try:
+        generate_lrc_for_track(final_audio_dest, track)
+    except Exception:
+        _logger.warning(f"lyrics_failed for {track.title}")
+    db.mark_success(track.track_id, str(final_audio_dest))
+
+
+def run_redownload_playlist(playlist_name: str, cfg: AppConfig, limit: int | None = None) -> None:
+    """Fetch tracks from Navidrome playlist (e.g. REDOWNLOAD), resolve to Yandex track_ids,
+    redownload from Yandex Music, and replace existing files.
+    Skips tracks not in migration DB or from SoundCloud.
+    """
+    data_dir = _get_data_dir()
+    music_root = cfg.music_root
+    pl = navidrome_client.get_playlist_by_name(playlist_name)
+    if pl is None:
+        _logger.error(f"playlist_not_found: {playlist_name!r}")
+        raise RuntimeError(f"Playlist {playlist_name!r} not found in Navidrome")
+    _logger.info(f"fetched_playlist {playlist_name!r}: {len(pl.entries)} tracks")
+    with MigrationDB(data_dir / "migration.db") as db:
+        processed = 0
+        for entry in pl.entries:
+            if limit is not None and processed >= limit:
+                break
+            full_path = (music_root / entry.path).resolve()
+            track_id = db.get_track_id_by_dest_path(full_path)
+            if track_id is None:
+                _logger.warning(f"track_not_in_migration_db: {full_path}")
+                continue
+            if track_id.startswith("sc_"):
+                _logger.info(f"skip_soundcloud {entry.title}")
+                continue
+            track = fetch_failed_track_metadata(track_id)
+            process_single_track_replace(track, cfg, db, full_path)
+            processed += 1
+    _logger.info(f"redownloaded {processed} tracks from {playlist_name!r}")
 
 
 def run_sync_like_tracks(cfg: AppConfig, limit: int | None = None) -> None:

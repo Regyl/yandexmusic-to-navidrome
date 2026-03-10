@@ -14,6 +14,7 @@ from cli_core import (
     run_count_successful,
     run_import_soundcloud_likes,
     run_list_failed,
+    run_redownload_playlist,
     run_retry_failed,
     run_sync_like_tracks,
 )
@@ -70,6 +71,31 @@ def soundcloud_import_test_command(
     cfg = _build_config()
     run_import_soundcloud_likes(username, cfg, limit=1)
     _logger.info("finished soundcloud-import-test")
+
+
+@app.command("redownload-playlist")
+def redownload_playlist_command(
+    playlist_name: str = typer.Option(
+        "_REDOWNLOAD",
+        "--playlist",
+        "-p",
+        help="Name of the Navidrome playlist to redownload (default: _REDOWNLOAD).",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        "-n",
+        help="Process at most N tracks (for testing).",
+    ),
+) -> None:
+    """Fetch tracks from a Navidrome playlist, redownload from Yandex Music, and replace existing files.
+    Requires NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD in .env.
+    Skips tracks not in migration DB or from SoundCloud."""
+    data_dir = _get_data_dir()
+    configure_logging(data_dir / "migration.log")
+    cfg = _build_config()
+    run_redownload_playlist(playlist_name, cfg, limit=limit)
+    _logger.info("finished redownload-playlist")
 
 
 @app.command("retry-failed")

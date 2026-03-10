@@ -63,6 +63,11 @@ pip install -r requirements.txt
 - `NAVIDROME_FOLDER` – Целевая директория, откуда navidrome читает музыку/альбомы/артистов
 - `YANDEX_MUSIC_PERIOD_BETWEEN_REQUESTS` - Период между запросами в ЯМ, дабы избежать блокировки rate limit
 
+Для команды `redownload-playlist` (перекачка треков из плейлиста Navidrome):
+- `NAVIDROME_URL` – URL сервера Navidrome (напр. https://navidrome.example.com)
+- `NAVIDROME_USER` – Логин пользователя Navidrome
+- `NAVIDROME_PASSWORD` – Пароль пользователя Navidrome. Если пароль содержит `#`, `&`, запятые и др. спецсимволы — обязательно возьмите значение в кавычки: `NAVIDROME_PASSWORD="2uY#hG,#^Tw&;_4"`
+
 ## Использование
 
 1. Запустить выгрузку с ЯМ в navidrome
@@ -95,7 +100,17 @@ python -m main count-successful
 python -m main soundcloud-import <your_nickname>
 ```
 
-6. Запуск webui:
+6. Перекачать треки из плейлиста Navidrome (напр. `_REDOWNLOAD`) заново с ЯМ:
+
+```bash
+python -m main redownload-playlist
+# или указать другой плейлист:
+python -m main redownload-playlist --playlist _REDOWNLOAD
+# тест на одном треке:
+python -m main redownload-playlist --limit 1
+```
+
+7. Запуск webui:
 
 ```bash
 python -m main web
