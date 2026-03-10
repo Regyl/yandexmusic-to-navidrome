@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as _dt
 import sqlite3
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 FailedTrack = Tuple[str, str]  # (track_id, error)
 
@@ -114,3 +114,26 @@ class MigrationDB:
         cursor = self._connection.execute("SELECT COUNT(*) FROM migrations")
         row = cursor.fetchone()
         return row[0] if row else 0
+
+    def get_track_id_by_dest_path(self, path: Path) -> Optional[str]:
+        """Return track_id for a successful migration whose dest_path matches the given path.
+        path is the full filesystem path. Only considers successful migrations. Returns None if not found.
+        """
+        resolved = path.resolve()
+        cursor = self._connection.execute(
+            "SELECT track_id, dest_path FROM migrations WHERE status = 'success' AND dest_path IS NOT NULL"
+        )
+        for row in cursor.fetchall():
+            tid, dest = row[0], row[1]
+            if not dest:
+                continue
+            try:
+                dest_resolved = Path(dest).resolve()
+            except Exception:
+                continue
+            if dest_resolved == resolved:
+                return tid
+            # Normalize separators for cross-platform match
+            if str(dest_resolved).replace("\\", "/") == str(resolved).replace("\\", "/"):
+                return tid
+        return None

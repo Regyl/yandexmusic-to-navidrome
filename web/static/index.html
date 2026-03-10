@@ -500,6 +500,15 @@
           <button type="button" class="btn btn-primary" id="btnRetryFailed">Run</button>
         </div>
         <div class="run-card">
+          <h3>Redownload Playlist</h3>
+          <p class="run-desc">Fetch tracks from a Navidrome playlist (e.g. _REDOWNLOAD), redownload from Yandex Music, and replace existing files. Requires NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD.</p>
+          <div class="run-row">
+            <label for="redownloadPlaylistName">Playlist name</label>
+            <input type="text" id="redownloadPlaylistName" placeholder="_REDOWNLOAD"/>
+          </div>
+          <button type="button" class="btn btn-primary" id="btnRedownloadPlaylist">Run</button>
+        </div>
+        <div class="run-card">
           <h3>SoundCloud Import</h3>
           <p class="run-desc">Download liked tracks and all tracks from your playlists. Enter your SoundCloud username (from your profile URL).</p>
           <div class="run-row">
@@ -542,6 +551,7 @@
     const btnYm = document.getElementById('btnYmImport');
     const btnYmTest = document.getElementById('btnYmImportTest');
     const btnRetry = document.getElementById('btnRetryFailed');
+    const btnRedownload = document.getElementById('btnRedownloadPlaylist');
     const btnScLikes = document.getElementById('btnSoundcloudLikes');
     const btnScLikesTest = document.getElementById('btnSoundcloudLikesTest');
     const logView = document.getElementById('logView');
@@ -596,6 +606,7 @@
       btnYm.disabled = running;
       btnYmTest.disabled = running;
       btnRetry.disabled = running;
+      btnRedownload.disabled = running;
       btnScLikes.disabled = running;
       btnScLikesTest.disabled = running;
 
@@ -695,6 +706,10 @@
     });
     btnRetry.addEventListener('click', () => {
       runCommand('/api/run/retry-failed', {});
+    });
+    btnRedownload.addEventListener('click', () => {
+      const name = document.getElementById('redownloadPlaylistName').value.trim() || '_REDOWNLOAD';
+      runCommand('/api/run/redownload-playlist', { playlist_name: name });
     });
     btnScLikes.addEventListener('click', () => {
       const username = document.getElementById('soundcloudUsername').value.trim();
